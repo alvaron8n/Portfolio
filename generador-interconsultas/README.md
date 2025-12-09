@@ -15,6 +15,9 @@ Los médicos dedican una cantidad significativa de tiempo a rellenar interconsul
 - **Plantillas configurables**: Sistema de plantillas con placeholders personalizables
 - **Servicios destino editables**: Lista de especialidades médicas configurable
 - **Mejora con IA** (opcional): Mejora de redacción usando OpenAI (no modifica contenido clínico)
+- **Impresión optimizada**: Botón de imprimir con estilos @media print
+- **Atajos de teclado**: Ctrl+Enter (o Cmd+Enter en Mac) para generar rápidamente
+- **Persistencia servidor**: Datos almacenados en servidor (JSON/FS), no en navegador
 - **Diseño responsive**: Funciona en escritorio y móvil
 
 ## Stack Tecnológico
@@ -23,7 +26,7 @@ Los médicos dedican una cantidad significativa de tiempo a rellenar interconsul
 - **Lenguaje**: TypeScript
 - **Estilos**: Tailwind CSS
 - **IA**: OpenAI API (opcional)
-- **Persistencia**: localStorage (MVP), preparado para migrar a base de datos
+- **Persistencia**: JSON/FileSystem en servidor, preparado para migrar a Prisma/PostgreSQL
 
 ## Inicio Rápido
 
@@ -72,9 +75,11 @@ La clave de API se puede obtener en [https://platform.openai.com/api-keys](https
    - **Datos del paciente**: Nombre/iniciales, edad, sexo
    - **Información clínica**: Motivo, antecedentes, exploración, presunción diagnóstica
    - **Datos del médico**: Nombre, servicio, centro
-3. Pulsa "Generar Interconsulta"
+3. Pulsa "Generar Interconsulta" o usa **Ctrl+Enter** (Cmd+Enter en Mac)
 4. El texto generado aparece en el panel derecho
-5. Usa "Copiar" para copiar al portapapeles
+5. Opciones disponibles:
+   - **Copiar**: Copiar al portapapeles
+   - **Imprimir**: Imprimir documento con formato optimizado
 
 ### 2. Mejorar con IA (si está configurada)
 
@@ -97,24 +102,28 @@ src/
 ├── app/
 │   ├── api/
 │   │   ├── enhance-interconsulta/   # API para mejora con IA
-│   │   └── servicios/               # API para gestión de servicios
+│   │   ├── plantillas/              # API para gestión de plantillas
+│   │   └── servicios/               # API CRUD para servicios destino
 │   ├── configuracion/               # Página de configuración
 │   ├── layout.tsx                   # Layout principal
 │   ├── page.tsx                     # Página principal (generador)
-│   └── globals.css                  # Estilos globales
+│   └── globals.css                  # Estilos globales + @media print
 ├── components/
-│   ├── InterconsultaForm.tsx        # Formulario de interconsulta
-│   ├── GeneratedTextPanel.tsx       # Panel de texto generado
+│   ├── InterconsultaForm.tsx        # Formulario con atajos de teclado
+│   ├── GeneratedTextPanel.tsx       # Panel con copiar/imprimir/IA
 │   ├── Header.tsx                   # Cabecera de navegación
 │   └── LegalDisclaimer.tsx          # Aviso legal obligatorio
 ├── lib/
-│   ├── ai.ts                        # Capa de servicio para IA
-│   ├── storage.ts                   # Sistema de persistencia
+│   ├── server/
+│   │   └── configRepo.ts            # Repositorio servidor (FS/JSON)
+│   ├── ai.ts                        # Capa IA con manejo de errores
+│   ├── storage.ts                   # Utilidades cliente (legado)
 │   ├── templateEngine.ts            # Motor de plantillas
 │   └── validation.ts                # Validaciones del formulario
 ├── types/
 │   └── index.ts                     # Tipos TypeScript del dominio
 └── data/
+    ├── config.json                  # Configuración persistida (generado)
     └── default-config.ts            # Configuración por defecto
 ```
 
@@ -132,10 +141,10 @@ src/
 
 ## Limitaciones del MVP
 
-- **Sin autenticación**: No hay sistema de login (preparado para añadir)
-- **Sin base de datos**: Datos almacenados en localStorage del navegador
+- **Sin autenticación**: No hay sistema de login (preparado para multi-tenant)
+- **Persistencia básica**: Datos en JSON/FS (preparado para Prisma/PostgreSQL)
 - **Sin integración HIS**: No se conecta con sistemas hospitalarios
-- **Sin almacenamiento de pacientes**: Los datos no se guardan entre sesiones
+- **Sin almacenamiento de pacientes**: Los datos clínicos no se guardan
 
 ## Evolución Futura
 

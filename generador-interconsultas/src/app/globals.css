@@ -75,11 +75,68 @@ pre {
 
 /* Estilos de impresión */
 @media print {
+  /* Reset para impresión */
+  * {
+    transition: none !important;
+    box-shadow: none !important;
+  }
+
   body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+    line-height: 1.5;
+  }
+
+  /* Ocultar elementos no necesarios en impresión */
+  .no-print,
+  header,
+  footer,
+  nav,
+  button {
+    display: none !important;
+  }
+
+  /* Mostrar solo el contenido del documento */
+  .print-area {
+    display: block !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 20mm;
     background: white;
   }
 
-  .no-print {
-    display: none !important;
+  /* Contenedor principal para impresión */
+  pre {
+    background: white !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 11pt !important;
+    font-family: "Times New Roman", Times, serif !important;
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+    color: black !important;
+    page-break-inside: auto;
+  }
+
+  /* Configuración de página */
+  @page {
+    size: A4;
+    margin: 20mm;
+  }
+
+  /* Evitar cortes de página en medio de párrafos */
+  p, h1, h2, h3, h4, h5, h6 {
+    page-break-inside: avoid;
+    page-break-after: avoid;
+  }
+
+  /* Forzar colores para impresión */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }

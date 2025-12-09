@@ -85,11 +85,41 @@ export interface PlantillaConfig {
 }
 
 /**
+ * Plantillas organizadas por tipo de documento
+ * Facilita el acceso directo a la plantilla de cada tipo
+ */
+export interface PlantillasPorTipo {
+  interconsulta?: PlantillaConfig;
+  informe_alta?: PlantillaConfig;
+  peticion_pruebas?: PlantillaConfig;
+}
+
+/**
  * Configuración general del sistema
+ *
+ * Esta interfaz está diseñada para ser compatible con:
+ * - Persistencia en JSON (MVP actual)
+ * - Futura migración a Prisma/PostgreSQL
+ * - Soporte multi-tenant (multi-clínica)
  */
 export interface ConfiguracionSistema {
+  // ID de clínica para futuro soporte multi-tenant
+  clinicId?: string;
+
+  // Versión del esquema de configuración
+  version?: string;
+
+  // Timestamp de última modificación
+  ultimaModificacion?: string;
+
+  // Lista de servicios destino disponibles
   serviciosDestino: ServicioDestino[];
+
+  // Array de plantillas (para compatibilidad legacy)
   plantillas: PlantillaConfig[];
+
+  // Plantillas organizadas por tipo (nueva estructura preferida)
+  plantillasPorTipo?: PlantillasPorTipo;
 }
 
 /**

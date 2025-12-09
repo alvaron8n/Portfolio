@@ -3,9 +3,49 @@
  *
  * Actualmente usa OpenAI, pero diseñado para poder cambiar de proveedor.
  * El proveedor se puede cambiar modificando solo este archivo.
+ *
+ * Configuración y límites:
+ * - Modelo: gpt-4o-mini (económico y rápido)
+ * - Límite de entrada: 10,000 caracteres
+ * - Límite de salida: 2,000 tokens (~8,000 caracteres)
+ * - Timeout: 30 segundos
+ *
+ * Para multi-tenant con rate limiting, considerar:
+ * - Redis para tracking de uso por tenant
+ * - Límites diarios/mensuales por plan
  */
 
 import OpenAI from 'openai';
+
+// Constantes de configuración
+const AI_CONFIG = {
+  model: 'gpt-4o-mini',
+  maxInputLength: 10000,
+  maxOutputTokens: 2000,
+  temperature: 0.3,
+  timeoutMs: 30000,
+} as const;
+
+// Tipos de error específicos para IA
+export type AIErrorCode =
+  | 'NOT_CONFIGURED'
+  | 'INPUT_TOO_LONG'
+  | 'EMPTY_INPUT'
+  | 'RATE_LIMITED'
+  | 'TIMEOUT'
+  | 'API_ERROR'
+  | 'UNKNOWN_ERROR';
+
+export class AIError extends Error {
+  constructor(
+    message: string,
+    public code: AIErrorCode,
+    public retryable: boolean = false
+  ) {
+    super(message);
+    this.name = 'AIError';
+  }
+}
 
 // Prompt del sistema para mejorar interconsultas
 const SYSTEM_PROMPT = `Eres un asistente especializado en documentación médica española.
@@ -32,24 +72,59 @@ export function isAIConfigured(): boolean {
 }
 
 /**
+ * Valida el texto de entrada antes de enviarlo a la IA
+ */
+function validateInput(text: string): void {
+  if (!text || typeof text !== 'string') {
+    throw new AIError(
+      'El texto es requerido',
+      'EMPTY_INPUT'
+    );
+  }
+
+  const trimmedLength = text.trim().length;
+  if (trimmedLength === 0) {
+    throw new AIError(
+      'El texto no puede estar vacío',
+      'EMPTY_INPUT'
+    );
+  }
+
+  if (trimmedLength > AI_CONFIG.maxInputLength) {
+    throw new AIError(
+      `El texto excede el límite de ${AI_CONFIG.maxInputLength.toLocaleString()} caracteres. Longitud actual: ${trimmedLength.toLocaleString()}`,
+      'INPUT_TOO_LONG'
+    );
+  }
+}
+
+/**
  * Mejora el texto de una interconsulta usando IA
  *
  * @param text - Texto original de la interconsulta
  * @returns Texto mejorado
- * @throws Error si la IA no está configurada o hay un error en la llamada
+ * @throws AIError si hay cualquier problema
  */
 export async function enhanceInterconsultaText(text: string): Promise<string> {
+  // Validación de configuración
   if (!process.env.OPENAI_API_KEY) {
-    throw new Error('La IA no está configurada. Añade OPENAI_API_KEY en las variables de entorno.');
+    throw new AIError(
+      'La IA no está configurada. Añade OPENAI_API_KEY en las variables de entorno.',
+      'NOT_CONFIGURED'
+    );
   }
+
+  // Validación de entrada
+  validateInput(text);
 
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
+    timeout: AI_CONFIG.timeoutMs,
   });
 
   try {
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // Modelo económico y rápido, suficiente para mejora de redacción
+      model: AI_CONFIG.model,
       messages: [
         {
           role: 'system',
@@ -60,24 +135,90 @@ export async function enhanceInterconsultaText(text: string): Promise<string> {
           content: `Por favor, mejora la redacción del siguiente texto de interconsulta médica. Recuerda: SOLO mejora la redacción, NO añadas ni modifiques información clínica.\n\n${text}`,
         },
       ],
-      temperature: 0.3, // Baja temperatura para resultados más consistentes
-      max_tokens: 2000,
+      temperature: AI_CONFIG.temperature,
+      max_tokens: AI_CONFIG.maxOutputTokens,
     });
 
     const enhancedText = completion.choices[0]?.message?.content;
 
     if (!enhancedText) {
-      throw new Error('No se recibió respuesta de la IA');
+      throw new AIError(
+        'No se recibió respuesta de la IA',
+        'API_ERROR',
+        true
+      );
     }
 
     return enhancedText.trim();
   } catch (error) {
-    if (error instanceof OpenAI.APIError) {
-      console.error('Error de API de OpenAI:', error.message);
-      throw new Error(`Error al comunicarse con la IA: ${error.message}`);
+    // Re-throw AIError as-is
+    if (error instanceof AIError) {
+      throw error;
     }
-    throw error;
+
+    // Handle OpenAI-specific errors
+    if (error instanceof OpenAI.APIError) {
+      console.error('Error de API de OpenAI:', error.message, { status: error.status });
+
+      // Rate limiting
+      if (error.status === 429) {
+        throw new AIError(
+          'Se ha superado el límite de peticiones. Por favor, espere un momento antes de intentarlo de nuevo.',
+          'RATE_LIMITED',
+          true
+        );
+      }
+
+      // Server errors (retryable)
+      if (error.status && error.status >= 500) {
+        throw new AIError(
+          'El servicio de IA no está disponible temporalmente. Por favor, inténtelo de nuevo.',
+          'API_ERROR',
+          true
+        );
+      }
+
+      // Authentication/authorization errors
+      if (error.status === 401 || error.status === 403) {
+        throw new AIError(
+          'Error de autenticación con el servicio de IA. Verifique la configuración.',
+          'NOT_CONFIGURED'
+        );
+      }
+
+      throw new AIError(
+        `Error al comunicarse con la IA: ${error.message}`,
+        'API_ERROR',
+        error.status !== undefined && error.status >= 500
+      );
+    }
+
+    // Timeout errors
+    if (error instanceof Error && error.message.includes('timeout')) {
+      throw new AIError(
+        'La petición a la IA ha tardado demasiado. Por favor, inténtelo de nuevo.',
+        'TIMEOUT',
+        true
+      );
+    }
+
+    // Unknown errors
+    console.error('Error desconocido en IA:', error);
+    throw new AIError(
+      'Error inesperado al procesar la petición',
+      'UNKNOWN_ERROR'
+    );
   }
+}
+
+/**
+ * Obtiene la configuración actual de IA (útil para mostrar límites en UI)
+ */
+export function getAIConfig() {
+  return {
+    maxInputLength: AI_CONFIG.maxInputLength,
+    isConfigured: isAIConfigured(),
+  };
 }
 
 /**

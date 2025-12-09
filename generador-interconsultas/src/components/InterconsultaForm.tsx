@@ -10,7 +10,7 @@
  * - Datos del médico
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   InterconsultaFormData,
   Prioridad,
@@ -19,7 +19,6 @@ import {
   ValidationError
 } from '@/types';
 import { validateInterconsultaForm, getFieldError } from '@/lib/validation';
-import { getServiciosDestino } from '@/lib/storage';
 
 interface InterconsultaFormProps {
   initialValues?: Partial<InterconsultaFormData>;
@@ -61,16 +60,44 @@ export default function InterconsultaForm({
   onGenerate,
   loading = false,
 }: InterconsultaFormProps) {
+  const formRef = useRef<HTMLFormElement>(null);
   const [formData, setFormData] = useState<InterconsultaFormData>({
     ...initialFormState,
     ...initialValues,
   });
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [servicios, setServicios] = useState<ServicioDestino[]>([]);
+  const [loadingServicios, setLoadingServicios] = useState(true);
 
-  // Cargar servicios destino al montar el componente
+  // Cargar servicios destino desde la API al montar el componente
   useEffect(() => {
-    setServicios(getServiciosDestino());
+    async function loadServicios() {
+      try {
+        const response = await fetch('/api/servicios');
+        if (response.ok) {
+          const data = await response.json();
+          setServicios(data.servicios || []);
+        }
+      } catch (error) {
+        console.error('Error al cargar servicios:', error);
+      } finally {
+        setLoadingServicios(false);
+      }
+    }
+    loadServicios();
+  }, []);
+
+  // Atajo de teclado: Ctrl+Enter (o Cmd+Enter en Mac) para generar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        formRef.current?.requestSubmit();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   // Actualizar datos generales
@@ -157,7 +184,7 @@ export default function InterconsultaForm({
     }`;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
       {/* Errores globales */}
       {errors.length > 0 && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -232,11 +259,18 @@ export default function InterconsultaForm({
               value={formData.servicioDestino}
               onChange={e => updateField('servicioDestino', e.target.value)}
               className={inputClass('servicioDestino')}
+              disabled={loadingServicios}
             >
-              <option value="">Seleccione un servicio...</option>
-              {servicios.map(s => (
-                <option key={s.id} value={s.nombre}>{s.nombre}</option>
-              ))}
+              {loadingServicios ? (
+                <option value="">Cargando servicios...</option>
+              ) : (
+                <>
+                  <option value="">Seleccione un servicio...</option>
+                  {servicios.map(s => (
+                    <option key={s.id} value={s.nombre}>{s.nombre}</option>
+                  ))}
+                </>
+              )}
             </select>
             {renderError('servicioDestino')}
           </div>
@@ -488,7 +522,12 @@ export default function InterconsultaForm({
               Generando...
             </span>
           ) : (
-            'Generar Interconsulta'
+            <span className="flex items-center justify-center gap-2">
+              Generar Interconsulta
+              <kbd className="hidden sm:inline-flex items-center px-2 py-0.5 text-xs bg-blue-700 rounded">
+                Ctrl+Enter
+              </kbd>
+            </span>
           )}
         </button>
 
