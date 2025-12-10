@@ -201,34 +201,48 @@ export const DOCUMENT_TYPES: DocumentType[] = [
     nombre: 'Interconsulta',
     descripcion: 'Derivación a especialista',
     ruta: '/',
-    icon: '📋',
+    icon: 'interconsulta',
   },
   {
     id: 'peticion-pruebas',
     nombre: 'Petición de Pruebas',
     descripcion: 'Solicitud de pruebas diagnósticas',
     ruta: '/documents/peticion-pruebas',
-    icon: '🔬',
+    icon: 'pruebas',
   },
   {
     id: 'nota-evolutiva',
     nombre: 'Nota Evolutiva',
     descripcion: 'Seguimiento del paciente',
     ruta: '/documents/nota-evolutiva',
-    icon: '📝',
+    icon: 'evolutiva',
   },
   {
     id: 'informe-alta',
     nombre: 'Informe de Alta',
     descripcion: 'Informe al dar de alta',
     ruta: '/documents/informe-alta',
-    icon: '📄',
+    icon: 'alta',
   },
   {
     id: 'informe-social',
     nombre: 'Informe Social',
     descripcion: 'Informe para trabajo social',
     ruta: '/documents/informe-social',
-    icon: '👥',
+    icon: 'social',
   },
 ];
+
+/**
+ * Componente SVG para iconos de documentos (sin emojis)
+ */
+export function getDocumentIconClass(iconType: string): string {
+  const iconClasses: Record<string, string> = {
+    interconsulta: 'text-blue-600 dark:text-blue-400',
+    pruebas: 'text-purple-600 dark:text-purple-400',
+    evolutiva: 'text-green-600 dark:text-green-400',
+    alta: 'text-amber-600 dark:text-amber-400',
+    social: 'text-teal-600 dark:text-teal-400',
+  };
+  return iconClasses[iconType] || 'text-gray-600 dark:text-gray-400';
+}

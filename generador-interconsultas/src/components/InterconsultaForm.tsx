@@ -22,6 +22,15 @@ import { validateInterconsultaForm, getFieldError } from '@/lib/validation';
 import { getPresetByServicio, SpecialtyPreset } from '@/data/presets';
 import { getFrasesPorSeccion, incrementarUsoFrase, SeccionFrase, SECCION_LABELS } from '@/lib/frasesRapidas';
 import { canAutoGenerate, getQuickModeConfig, isEssentialField } from '@/lib/quickMode';
+import {
+  saveFormData,
+  getAutosavedData,
+  hasAutosavedData,
+  clearAutosave,
+  getAutosaveInterval,
+  formatAutosaveTime,
+  getAutosaveTimestamp,
+} from '@/lib/autosave';
 
 interface InterconsultaFormProps {
   initialValues?: Partial<InterconsultaFormData>;
@@ -79,6 +88,48 @@ export default function InterconsultaForm({
   const [currentPreset, setCurrentPreset] = useState<SpecialtyPreset | null>(null);
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [activeFrasesMenu, setActiveFrasesMenu] = useState<SeccionFrase | null>(null);
+
+  // Autosave state
+  const [lastAutosave, setLastAutosave] = useState<string | null>(null);
+  const [showRestorePrompt, setShowRestorePrompt] = useState(false);
+
+  // Check for autosaved data on mount
+  useEffect(() => {
+    if (hasAutosavedData('interconsulta')) {
+      const timestamp = getAutosaveTimestamp('interconsulta');
+      if (timestamp) {
+        setShowRestorePrompt(true);
+      }
+    }
+  }, []);
+
+  // Autosave form data periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Only autosave if there's meaningful data
+      if (formData.informacionClinica.motivoPrincipal || formData.paciente.nombre) {
+        saveFormData('interconsulta', formData);
+        setLastAutosave(new Date().toISOString());
+      }
+    }, getAutosaveInterval());
+
+    return () => clearInterval(interval);
+  }, [formData]);
+
+  // Restore autosaved data
+  const handleRestoreAutosave = () => {
+    const saved = getAutosavedData<InterconsultaFormData>('interconsulta');
+    if (saved) {
+      setFormData(saved);
+    }
+    setShowRestorePrompt(false);
+  };
+
+  // Discard autosaved data
+  const handleDiscardAutosave = () => {
+    clearAutosave();
+    setShowRestorePrompt(false);
+  };
 
   // Load services
   useEffect(() => {
@@ -247,9 +298,29 @@ export default function InterconsultaForm({
       getFieldError(errors, field) ? 'border-red-500 bg-red-50 dark:bg-red-900/20 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
     }`;
 
+  // Frases cache (loaded client-side only to avoid hydration mismatch)
+  const [frasesCache, setFrasesCache] = useState<Record<SeccionFrase, ReturnType<typeof getFrasesPorSeccion>>>({
+    motivo: [],
+    antecedentes: [],
+    exploracion: [],
+    presuncion: [],
+    tratamiento: [],
+  });
+
+  // Load frases on mount (client-side only)
+  useEffect(() => {
+    setFrasesCache({
+      motivo: getFrasesPorSeccion('motivo'),
+      antecedentes: getFrasesPorSeccion('antecedentes'),
+      exploracion: getFrasesPorSeccion('exploracion'),
+      presuncion: getFrasesPorSeccion('presuncion'),
+      tratamiento: getFrasesPorSeccion('tratamiento'),
+    });
+  }, []);
+
   // Quick Phrases Button
   const QuickPhrasesButton = ({ seccion }: { seccion: SeccionFrase }) => {
-    const frases = getFrasesPorSeccion(seccion);
+    const frases = frasesCache[seccion];
     const isOpen = activeFrasesMenu === seccion;
     if (frases.length === 0) return null;
 
@@ -259,7 +330,7 @@ export default function InterconsultaForm({
           type="button"
           onClick={() => setActiveFrasesMenu(isOpen ? null : seccion)}
           className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-1"
-          title="Insertar frase rápida"
+          title="Insertar frase rapida"
         >
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -297,7 +368,54 @@ export default function InterconsultaForm({
 
   return (
     <>
+      {/* Autosave restore prompt */}
+      {showRestorePrompt && (
+        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2">
+              <svg className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                  Hay un borrador guardado automaticamente
+                </p>
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                  {formatAutosaveTime(getAutosaveTimestamp('interconsulta') || '')}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleRestoreAutosave}
+                className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+              >
+                Restaurar
+              </button>
+              <button
+                type="button"
+                onClick={handleDiscardAutosave}
+                className="px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-800/50 rounded transition-colors"
+              >
+                Descartar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+        {/* Autosave indicator */}
+        {lastAutosave && (
+          <div className="flex items-center justify-end gap-1.5 text-xs text-gray-400 dark:text-gray-500">
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span>Autoguardado {formatAutosaveTime(lastAutosave)}</span>
+          </div>
+        )}
+
         {/* Error summary */}
         {errors.length > 0 && (
           <div className="p-3 sm:p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">

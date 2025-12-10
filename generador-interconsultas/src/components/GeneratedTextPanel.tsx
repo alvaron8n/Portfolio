@@ -14,7 +14,7 @@
  * - Vista diff para comparar texto original vs mejorado con IA
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import DocumentPreview from './DocumentPreview';
 import { InterconsultaFormData } from '@/types';
 import { getChecklistForServicio, ChecklistItem } from '@/data/checklists';
@@ -34,24 +34,24 @@ export interface AIModeConfig {
 export const AI_MODES: AIModeConfig[] = [
   {
     id: 'improve',
-    label: 'Mejorar redacción',
-    description: 'Mejora la claridad, ortografía y estilo del texto sin cambiar la información clínica.',
-    shortDesc: 'Mejora redacción sin cambiar la información clínica.',
-    icon: '✍️',
+    label: 'Mejorar redaccion',
+    description: 'Mejora la claridad, ortografia y estilo del texto sin cambiar la informacion clinica.',
+    shortDesc: 'Mejora redaccion sin cambiar la informacion clinica.',
+    icon: 'improve',
   },
   {
     id: 'format',
     label: 'Formato profesional',
-    description: 'Reorganiza el texto en secciones claras siguiendo el formato de informe médico estándar, sin añadir contenido nuevo.',
-    shortDesc: 'Reorganiza el texto en secciones claras, sin añadir contenido nuevo.',
-    icon: '📋',
+    description: 'Reorganiza el texto en secciones claras siguiendo el formato de informe medico estandar, sin anadir contenido nuevo.',
+    shortDesc: 'Reorganiza el texto en secciones claras, sin anadir contenido nuevo.',
+    icon: 'format',
   },
   {
     id: 'summarize',
     label: 'Resumir',
-    description: 'Crea un resumen conciso de la interconsulta para otros profesionales, manteniendo la información clave.',
+    description: 'Crea un resumen conciso de la interconsulta para otros profesionales, manteniendo la informacion clave.',
     shortDesc: 'Crea un resumen conciso para otros profesionales.',
-    icon: '📝',
+    icon: 'summarize',
   },
 ];
 
@@ -83,6 +83,7 @@ export default function GeneratedTextPanel({
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [checklistStates, setChecklistStates] = useState<Record<string, boolean>>({});
   const [diffResult, setDiffResult] = useState<DiffResult | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   // Cargar checklist cuando cambia el servicio
   useEffect(() => {
@@ -108,10 +109,18 @@ export default function GeneratedTextPanel({
     }
   }, [originalText, text]);
 
-  // Imprimir documento
-  const handlePrint = () => {
-    window.print();
-  };
+  // Imprimir documento - cambia a vista profesional primero
+  const handlePrint = useCallback(() => {
+    setIsPrinting(true);
+    setActiveTab('preview');
+    // Esperar al menos un ciclo de render antes de imprimir
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        window.print();
+        setIsPrinting(false);
+      }, 150);
+    });
+  }, []);
 
   // Copiar texto al portapapeles
   const handleCopy = async () => {
@@ -227,19 +236,35 @@ export default function GeneratedTextPanel({
           {/* Botón Imprimir */}
           <button
             onClick={handlePrint}
-            disabled={!text}
-            title="Imprimir documento"
-            className="px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+            disabled={!text || isPrinting}
+            title="Imprimir documento (cambia a vista profesional)"
+            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 ${
+              isPrinting
+                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+            }`}
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-              />
-            </svg>
-            <span className="hidden sm:inline">Imprimir</span>
+            {isPrinting ? (
+              <>
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span className="hidden sm:inline">Preparando...</span>
+              </>
+            ) : (
+              <>
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                  />
+                </svg>
+                <span className="hidden sm:inline">Imprimir</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -506,7 +531,7 @@ export default function GeneratedTextPanel({
               >
                 {AI_MODES.map((mode) => (
                   <option key={mode.id} value={mode.id}>
-                    {mode.icon} {mode.label}
+                    {mode.label}
                   </option>
                 ))}
               </select>

@@ -18,7 +18,9 @@ body {
   font-family: var(--font-sans);
 }
 
-/* Estilos personalizados para el Generador de Interconsultas */
+/* ========================================
+   Generador de Interconsultas - Styles
+   ======================================== */
 
 /* Scrollbar personalizada */
 ::-webkit-scrollbar {
@@ -38,6 +40,18 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
 }
 
 /* Estilos para el texto generado */
@@ -66,77 +80,216 @@ pre {
   outline-offset: 2px;
 }
 
-/* Transiciones suaves */
-* {
-  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
+/* Transiciones suaves - excepto en impresión */
+@media not print {
+  * {
+    transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
 }
 
-/* Estilos de impresión */
+/* ========================================
+   ESTILOS DE IMPRESIÓN - CRITICAL
+   ======================================== */
 @media print {
-  /* Reset para impresión */
+  /* Forzar modo claro para impresión */
+  :root {
+    --background: white !important;
+    --foreground: black !important;
+  }
+
+  /* Reset de transiciones y sombras */
   * {
     transition: none !important;
+    animation: none !important;
     box-shadow: none !important;
+    text-shadow: none !important;
   }
 
-  body {
+  /* Base del body */
+  html, body {
     background: white !important;
     color: black !important;
-    font-size: 12pt;
-    line-height: 1.5;
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
   }
 
-  /* Ocultar elementos no necesarios en impresión */
-  .no-print,
-  header,
-  footer,
-  nav,
-  button {
+  /* OCULTAR TODO excepto el documento imprimible */
+  body > *:not(.print-root) {
     display: none !important;
   }
 
-  /* Mostrar solo el contenido del documento */
-  .print-area {
-    display: block !important;
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    padding: 20mm;
-    background: white;
+  /* Clase principal para marcar lo que NO se imprime */
+  .no-print,
+  [class*="print:hidden"],
+  header:not(.print-header),
+  footer:not(.print-footer),
+  nav,
+  button:not(.print-visible),
+  .print-hide {
+    display: none !important;
+    visibility: hidden !important;
   }
 
-  /* Contenedor principal para impresión */
+  /* El contenedor del documento imprimible */
+  #printable-document,
+  .print-area {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    color: black !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Asegurar que el documento tenga buen tamaño */
+  .print-area * {
+    visibility: visible !important;
+    color: inherit !important;
+  }
+
+  /* Forzar colores para elementos de colores */
+  .print-area .bg-blue-600,
+  .print-area .bg-blue-700,
+  .print-area [class*="bg-blue"] {
+    background-color: #2563eb !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-area .text-white {
+    color: white !important;
+  }
+
+  /* Secciones de color mantenidas en print */
+  .print-area .bg-blue-50 { background-color: #eff6ff !important; }
+  .print-area .bg-amber-50 { background-color: #fffbeb !important; }
+  .print-area .bg-green-50 { background-color: #f0fdf4 !important; }
+  .print-area .bg-slate-50 { background-color: #f8fafc !important; }
+  .print-area .bg-gray-50 { background-color: #f9fafb !important; }
+
+  /* Bordes de colores */
+  .print-area .border-blue-500 { border-color: #3b82f6 !important; }
+  .print-area .border-amber-500 { border-color: #f59e0b !important; }
+  .print-area .border-green-500 { border-color: #22c55e !important; }
+  .print-area .border-red-500 { border-color: #ef4444 !important; }
+
+  /* Texto legible */
+  .print-area .text-slate-800,
+  .print-area .text-gray-800,
+  .print-area .text-gray-900 {
+    color: #1f2937 !important;
+  }
+
+  .print-area .text-slate-500,
+  .print-area .text-gray-500,
+  .print-area .text-slate-400 {
+    color: #6b7280 !important;
+  }
+
+  /* Badges de prioridad */
+  .print-area .bg-green-100 { background-color: #dcfce7 !important; }
+  .print-area .text-green-800 { color: #166534 !important; }
+  .print-area .bg-amber-100 { background-color: #fef3c7 !important; }
+  .print-area .text-amber-800 { color: #92400e !important; }
+  .print-area .bg-red-100 { background-color: #fee2e2 !important; }
+  .print-area .text-red-800 { color: #991b1b !important; }
+
+  /* Configuración de página A4 */
+  @page {
+    size: A4 portrait;
+    margin: 15mm 15mm 20mm 15mm;
+  }
+
+  /* Primera página */
+  @page :first {
+    margin-top: 10mm;
+  }
+
+  /* Control de saltos de página */
+  .print-area h1, .print-area h2, .print-area h3 {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  .print-area section {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .print-area p {
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* Contenido pre */
   pre {
     background: white !important;
     border: none !important;
     padding: 0 !important;
     margin: 0 !important;
-    font-size: 11pt !important;
-    font-family: "Times New Roman", Times, serif !important;
+    font-size: 10pt !important;
+    font-family: "Courier New", Courier, monospace !important;
     white-space: pre-wrap !important;
     word-wrap: break-word !important;
     color: black !important;
     page-break-inside: auto;
   }
 
-  /* Configuración de página */
-  @page {
-    size: A4;
-    margin: 20mm;
-  }
-
-  /* Evitar cortes de página en medio de párrafos */
-  p, h1, h2, h3, h4, h5, h6 {
-    page-break-inside: avoid;
-    page-break-after: avoid;
-  }
-
-  /* Forzar colores para impresión */
+  /* Forzar colores exactos */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Links - mostrar URL */
+  a[href]:after {
+    content: none !important;
+  }
+}
+
+/* ========================================
+   Vista Profesional A4
+   ======================================== */
+
+/* Contenedor del documento A4 - scroll interno */
+.a4-container {
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+}
+
+/* En pantallas grandes, permitir scroll interno */
+@media (min-height: 700px) {
+  .a4-scroll-container {
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+  }
+}
+
+/* Dark mode adjustments para documento */
+.dark .a4-container {
+  /* El documento siempre tiene fondo claro para legibilidad */
+}
+
+/* En impresión, quitar scroll */
+@media print {
+  .a4-scroll-container {
+    max-height: none !important;
+    overflow: visible !important;
   }
 }
