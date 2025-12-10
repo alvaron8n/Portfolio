@@ -15,8 +15,8 @@ const documentTypes = [
   { href: '/', label: 'Interconsulta', icon: '📋', color: 'blue' },
   { href: '/documents/informe-alta', label: 'Informe de Alta', icon: '🏥', color: 'green' },
   { href: '/documents/peticion-pruebas', label: 'Petición de Pruebas', icon: '🔬', color: 'purple' },
-  { href: '/documents/nota-evolutiva', label: 'Nota Evolutiva', icon: '📝', color: 'amber', disabled: true },
-  { href: '/documents/informe-social', label: 'Informe Social', icon: '👥', color: 'pink', disabled: true },
+  { href: '/documents/nota-evolutiva', label: 'Nota Evolutiva', icon: '📝', color: 'amber' },
+  { href: '/documents/informe-social', label: 'Informe Social', icon: '👥', color: 'pink' },
 ];
 
 export default function Header() {
@@ -104,18 +104,10 @@ export default function Header() {
                   {documentTypes.map(doc => (
                     <Link
                       key={doc.href}
-                      href={doc.disabled ? '#' : doc.href}
-                      onClick={(e) => {
-                        if (doc.disabled) {
-                          e.preventDefault();
-                        } else {
-                          setIsDocMenuOpen(false);
-                        }
-                      }}
+                      href={doc.href}
+                      onClick={() => setIsDocMenuOpen(false)}
                       className={`flex items-center gap-3 px-3 py-2 text-sm transition-colors ${
-                        doc.disabled
-                          ? 'text-gray-400 cursor-not-allowed'
-                          : pathname === doc.href
+                        pathname === doc.href
                           ? 'bg-blue-50 text-blue-700'
                           : 'text-gray-700 hover:bg-gray-50'
                       }`}
@@ -123,9 +115,6 @@ export default function Header() {
                       <span className="text-lg">{doc.icon}</span>
                       <div className="flex-1">
                         <span className="block font-medium">{doc.label}</span>
-                        {doc.disabled && (
-                          <span className="text-xs text-gray-400">Próximamente</span>
-                        )}
                       </div>
                       {pathname === doc.href && (
                         <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
