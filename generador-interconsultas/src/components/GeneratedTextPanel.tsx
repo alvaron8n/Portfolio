@@ -4,17 +4,21 @@
  * Panel para mostrar el texto generado de la interconsulta
  *
  * Funcionalidades:
- * - Pestañas: Texto plano / Vista profesional
+ * - Pestañas: Texto plano / Vista profesional / Checklist / Comparación IA
  * - Botón para copiar al portapapeles
  * - Botón para imprimir
  * - Selector de modos de IA y botón para mejorar con tooltips
  * - Estados de carga y error
  * - Control de scroll interno para contenido largo
+ * - Checklist de revisión por servicio
+ * - Vista diff para comparar texto original vs mejorado con IA
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DocumentPreview from './DocumentPreview';
 import { InterconsultaFormData } from '@/types';
+import { getChecklistForServicio, ChecklistItem } from '@/data/checklists';
+import { compareTexts, DiffResult, getSegmentClassName } from '@/lib/textDiff';
 
 // Modos de IA disponibles
 export type AIMode = 'improve' | 'format' | 'summarize';
@@ -57,9 +61,11 @@ interface GeneratedTextPanelProps {
   onEnhance?: (mode: AIMode) => Promise<void>;
   aiAvailable?: boolean;
   enhancing?: boolean;
+  originalText?: string; // Texto antes de mejora con IA (para diff)
+  servicioDestino?: string; // Para cargar checklist específica
 }
 
-type ViewTab = 'plain' | 'preview';
+type ViewTab = 'plain' | 'preview' | 'checklist' | 'diff';
 
 export default function GeneratedTextPanel({
   text,
@@ -67,11 +73,40 @@ export default function GeneratedTextPanel({
   onEnhance,
   aiAvailable = false,
   enhancing = false,
+  originalText,
+  servicioDestino,
 }: GeneratedTextPanelProps) {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ViewTab>('plain');
   const [selectedAIMode, setSelectedAIMode] = useState<AIMode>('improve');
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [checklistStates, setChecklistStates] = useState<Record<string, boolean>>({});
+  const [diffResult, setDiffResult] = useState<DiffResult | null>(null);
+
+  // Cargar checklist cuando cambia el servicio
+  useEffect(() => {
+    if (servicioDestino) {
+      const checklistData = getChecklistForServicio(servicioDestino);
+      setChecklist(checklistData.items);
+      // Inicializar estados de checklist
+      const initialStates: Record<string, boolean> = {};
+      checklistData.items.forEach(item => {
+        initialStates[item.id] = false;
+      });
+      setChecklistStates(initialStates);
+    }
+  }, [servicioDestino]);
+
+  // Calcular diff cuando hay texto original y mejorado
+  useEffect(() => {
+    if (originalText && text && originalText !== text) {
+      const result = compareTexts(originalText, text);
+      setDiffResult(result);
+    } else {
+      setDiffResult(null);
+    }
+  }, [originalText, text]);
 
   // Imprimir documento
   const handlePrint = () => {
@@ -98,6 +133,18 @@ export default function GeneratedTextPanel({
       await onEnhance(selectedAIMode);
     }
   };
+
+  // Toggle checklist item
+  const toggleChecklistItem = (id: string) => {
+    setChecklistStates(prev => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
+
+  // Contar items completados
+  const checklistCompleted = Object.values(checklistStates).filter(Boolean).length;
+  const checklistTotal = checklist.length;
 
   // Si no hay texto, mostrar estado vacío
   if (!text) {
@@ -126,6 +173,9 @@ export default function GeneratedTextPanel({
               Rellene el formulario y pulse &quot;Generar Interconsulta&quot;
               para ver el documento aquí.
             </p>
+            <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
+              Atajo: <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">Ctrl+Enter</kbd>
+            </p>
           </div>
         </div>
       </div>
@@ -145,7 +195,7 @@ export default function GeneratedTextPanel({
           <button
             onClick={handleCopy}
             disabled={!text}
-            title="Copiar al portapapeles"
+            title="Copiar al portapapeles (Ctrl+C)"
             className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
               copied
                 ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
@@ -195,10 +245,10 @@ export default function GeneratedTextPanel({
       </div>
 
       {/* Pestañas de vista (fijas) */}
-      <div className="flex border-b border-gray-200 dark:border-gray-700 mb-3 print:hidden shrink-0">
+      <div className="flex border-b border-gray-200 dark:border-gray-700 mb-3 print:hidden shrink-0 overflow-x-auto">
         <button
           onClick={() => setActiveTab('plain')}
-          className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+          className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
             activeTab === 'plain'
               ? 'border-blue-500 text-blue-600 dark:text-blue-400'
               : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
@@ -208,13 +258,12 @@ export default function GeneratedTextPanel({
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
             </svg>
-            <span className="hidden sm:inline">Texto Plano</span>
-            <span className="sm:hidden">Texto</span>
+            <span className="hidden sm:inline">Texto</span>
           </span>
         </button>
         <button
           onClick={() => setActiveTab('preview')}
-          className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+          className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
             activeTab === 'preview'
               ? 'border-blue-500 text-blue-600 dark:text-blue-400'
               : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
@@ -224,10 +273,59 @@ export default function GeneratedTextPanel({
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <span className="hidden sm:inline">Vista Profesional</span>
-            <span className="sm:hidden">Vista</span>
+            <span className="hidden sm:inline">Vista</span>
           </span>
         </button>
+
+        {/* Tab Checklist - solo si hay checklist */}
+        {checklist.length > 0 && (
+          <button
+            onClick={() => setActiveTab('checklist')}
+            className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+              activeTab === 'checklist'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+              <span className="hidden sm:inline">Checklist</span>
+              {checklistTotal > 0 && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                  checklistCompleted === checklistTotal
+                    ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400'
+                    : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                }`}>
+                  {checklistCompleted}/{checklistTotal}
+                </span>
+              )}
+            </span>
+          </button>
+        )}
+
+        {/* Tab Diff - solo si hay comparación disponible */}
+        {diffResult && (
+          <button
+            onClick={() => setActiveTab('diff')}
+            className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+              activeTab === 'diff'
+                ? 'border-purple-500 text-purple-600 dark:text-purple-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+              <span className="hidden sm:inline">Cambios IA</span>
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-400">
+                {diffResult.changedPercentage}%
+              </span>
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Error de copia */}
@@ -239,17 +337,154 @@ export default function GeneratedTextPanel({
 
       {/* Contenido según pestaña activa - área con scroll */}
       <div className="flex-1 min-h-[300px] max-h-[calc(100vh-420px)] overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-        {activeTab === 'plain' ? (
+        {activeTab === 'plain' && (
           <pre className="h-full overflow-y-auto p-4 text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap font-mono print:bg-white print:border-none">
             {text}
           </pre>
-        ) : (
+        )}
+
+        {activeTab === 'preview' && (
           <div className="h-full overflow-y-auto p-3 sm:p-4 bg-slate-100 dark:bg-slate-800">
             <DocumentPreview
               formData={formData}
               plainText={text}
               documentType="interconsulta"
             />
+          </div>
+        )}
+
+        {activeTab === 'checklist' && (
+          <div className="h-full overflow-y-auto p-4">
+            <div className="space-y-3">
+              {/* Progress bar */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span className="text-gray-600 dark:text-gray-400">Progreso de revisión</span>
+                  <span className={`font-medium ${
+                    checklistCompleted === checklistTotal
+                      ? 'text-green-600 dark:text-green-400'
+                      : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    {checklistCompleted} de {checklistTotal}
+                  </span>
+                </div>
+                <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${
+                      checklistCompleted === checklistTotal
+                        ? 'bg-green-500'
+                        : 'bg-blue-500'
+                    }`}
+                    style={{ width: `${(checklistCompleted / checklistTotal) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Checklist items */}
+              {checklist.map(item => (
+                <label
+                  key={item.id}
+                  className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                    checklistStates[item.id]
+                      ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                      : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checklistStates[item.id] || false}
+                    onChange={() => toggleChecklistItem(item.id)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-medium ${
+                        checklistStates[item.id]
+                          ? 'text-green-700 dark:text-green-300 line-through'
+                          : 'text-gray-900 dark:text-gray-100'
+                      }`}>
+                        {item.texto}
+                      </span>
+                      {item.tipo === 'obligatorio' && (
+                        <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-400 rounded">
+                          Obligatorio
+                        </span>
+                      )}
+                      {item.tipo === 'recomendado' && (
+                        <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400 rounded">
+                          Recomendado
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </label>
+              ))}
+
+              {/* Mensaje cuando todo está completo */}
+              {checklistCompleted === checklistTotal && checklistTotal > 0 && (
+                <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-sm font-medium text-green-700 dark:text-green-300">
+                      Revisión completada
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'diff' && diffResult && (
+          <div className="h-full overflow-y-auto p-4">
+            {/* Stats de cambios */}
+            <div className="mb-4 flex flex-wrap gap-3">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                <span className="text-xs text-green-700 dark:text-green-300">
+                  +{diffResult.addedCount} palabras añadidas
+                </span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                <span className="text-xs text-red-700 dark:text-red-300">
+                  -{diffResult.removedCount} palabras eliminadas
+                </span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                <span className="text-xs text-purple-700 dark:text-purple-300">
+                  {diffResult.changedPercentage}% de cambio
+                </span>
+              </div>
+            </div>
+
+            {/* Diff view */}
+            <div className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <p className="text-sm leading-relaxed">
+                {diffResult.segments.map((segment, index) => (
+                  <span
+                    key={index}
+                    className={`${getSegmentClassName(segment.type)} ${
+                      segment.type !== 'equal' ? 'px-0.5 rounded' : ''
+                    }`}
+                  >
+                    {segment.text}
+                  </span>
+                ))}
+              </p>
+            </div>
+
+            {/* Leyenda */}
+            <div className="mt-4 flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 bg-green-100 dark:bg-green-900/30 rounded"></span>
+                <span>Texto añadido</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 bg-red-100 dark:bg-red-900/30 rounded"></span>
+                <span>Texto eliminado</span>
+              </div>
+            </div>
           </div>
         )}
       </div>

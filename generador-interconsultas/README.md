@@ -1,8 +1,8 @@
 # Generador de Interconsultas
 
-**SaaS profesional para la generación de borradores de interconsultas médicas**
+**SaaS profesional para la generación de borradores de documentos clínicos**
 
-Una herramienta diseñada para médicos de atención primaria y hospitalaria que necesitan generar documentos de interconsulta/derivación de forma rápida y estructurada.
+Una herramienta diseñada para médicos de atención primaria y hospitalaria que necesitan generar documentos de interconsulta, informes de alta, peticiones de pruebas y más, de forma rápida y estructurada.
 
 ## Descripción
 
@@ -10,21 +10,44 @@ Los médicos dedican una cantidad significativa de tiempo a rellenar interconsul
 
 ### Características principales
 
-- **Formulario estructurado**: Campos organizados por secciones (datos del paciente, información clínica, datos del médico)
-- **Generación instantánea**: Texto formateado listo para copiar y pegar
+**Generación de documentos**
+- **Multi-documento**: Soporte para 5 tipos de documentos (Interconsulta, Informe de Alta, Petición de Pruebas, Nota Evolutiva, Informe Social)
+- **Formulario estructurado**: Campos organizados por secciones
 - **Vista profesional A4**: Previsualización del documento con formato de página real
 - **Presets por especialidad**: Plantillas predefinidas para Cardiología, Neurología, Digestivo, etc.
-- **Plantillas configurables**: Sistema de plantillas con placeholders personalizables
-- **Servicios destino editables**: Lista de especialidades médicas configurable
-- **Mejora con IA** (opcional): Mejora de redacción usando OpenAI (no modifica contenido clínico)
+
+**Productividad premium**
+- **Modo Consulta Rápida**: Layout simplificado con solo campos esenciales (toggle con Ctrl+M)
+- **Auto-generación**: Genera borrador automáticamente cuando los campos tienen >30 caracteres
+- **Frases Rápidas**: Biblioteca de frases predefinidas insertables con un clic
+- **Multi-documento wizard**: Reutiliza datos del paciente para generar varios documentos
+- **Checklist de revisión**: Listas de verificación por servicio (Cardiología, Neurología, etc.)
+- **Analítica de uso**: Estadísticas de productividad y tiempo ahorrado
+
+**Mejora con IA**
+- **Mejora de redacción**: Usando OpenAI (no modifica contenido clínico)
 - **Modos de IA**: Mejorar redacción, formatear o resumir texto
-- **Impresión optimizada**: Botón de imprimir con estilos @media print
-- **Atajos de teclado**: Ctrl+Enter para generar, Esc para cerrar errores
-- **Auto-focus**: El cursor se posiciona automáticamente en el primer campo
-- **Integración webhooks**: Envía documentos a n8n, Zapier, Make u otros servicios
-- **Persistencia servidor**: Datos almacenados en servidor (JSON/FS)
+- **Comparación de cambios**: Vista diff mostrando qué modificó la IA
+
+**Personalización**
+- **Branding por centro**: Nombre, logo y colores de tu clínica
+- **Plantillas configurables**: Sistema de plantillas con placeholders
+- **Servicios editables**: Lista de especialidades médicas configurable
 - **Dark mode**: Soporte completo para modo oscuro
-- **Diseño responsive**: Funciona en escritorio y móvil
+
+**Integraciones**
+- **Webhooks**: Envía documentos a n8n, Zapier, Make u otros servicios
+- **Historial local**: Acceso a documentos recientes
+- **Impresión optimizada**: Botón de imprimir con estilos @media print
+
+**Atajos de teclado**
+| Atajo | Acción |
+|-------|--------|
+| `Ctrl+Enter` | Generar documento |
+| `Ctrl+M` | Toggle Modo Rápido |
+| `Ctrl+S` | Guardar borrador |
+| `Ctrl+L` | Limpiar formulario |
+| `Esc` | Cerrar errores |
 
 ## Stack Tecnológico
 
@@ -32,7 +55,7 @@ Los médicos dedican una cantidad significativa de tiempo a rellenar interconsul
 - **Lenguaje**: TypeScript
 - **Estilos**: Tailwind CSS
 - **IA**: OpenAI API (opcional)
-- **Persistencia**: JSON/FileSystem en servidor, preparado para migrar a Prisma/PostgreSQL
+- **Persistencia**: localStorage (cliente) + JSON/FS (servidor)
 - **Testing**: Vitest
 
 ## Inicio Rápido
@@ -94,8 +117,6 @@ El sistema puede enviar automáticamente los documentos generados a servicios ex
 
 #### Payload del webhook
 
-Cuando se genera un documento, se envía un POST con este formato:
-
 ```json
 {
   "event": "document.created",
@@ -113,19 +134,18 @@ Cuando se genera un documento, se envía un POST con este formato:
 }
 ```
 
-#### Ejemplo de workflow n8n
+## Guía de Uso
 
-1. **Trigger**: Webhook (POST)
-2. **Procesar datos**: Function node para extraer información
-3. **Acciones**:
-   - Guardar en Google Sheets/Notion
-   - Enviar email de confirmación
-   - Crear tarea en sistema de gestión
-   - Generar PDF y almacenar
+### 1. Modo estándar vs Modo rápido
 
-## Uso
+**Modo estándar**: Todos los campos disponibles, dos columnas
+**Modo rápido** (Ctrl+M): Solo campos esenciales, una columna, auto-generación
 
-### 1. Generar una interconsulta
+Para activar el Modo Rápido:
+- Pulsa el toggle "Modo Rápido" en la cabecera
+- O usa el atajo `Ctrl+M`
+
+### 2. Generar una interconsulta
 
 1. Accede a la página principal
 2. Rellena el formulario con los datos:
@@ -135,35 +155,52 @@ Cuando se genera un documento, se envía un POST con este formato:
    - **Datos del médico**: Nombre, servicio, centro
 3. Pulsa "Generar Interconsulta" o usa **Ctrl+Enter**
 4. El texto generado aparece en el panel derecho con formato A4
-5. Opciones disponibles:
-   - **Copiar**: Copiar al portapapeles
-   - **Imprimir**: Imprimir documento con formato optimizado
-   - **Vista previa**: Ver documento en formato profesional
 
-### 2. Usar presets de especialidad
+### 3. Usar frases rápidas
 
-1. Selecciona un servicio destino (ej: Cardiología)
-2. Si hay preset disponible, aparecerá un botón "Usar plantilla de..."
-3. Al pulsar, se cargan textos sugeridos como recordatorio de qué incluir
-4. Adapta el contenido al caso clínico específico
+1. En cualquier campo de texto clínico, verás botones de frases rápidas
+2. Haz clic en una frase para insertarla
+3. Gestiona tus frases en Configuración > Frases Rápidas
 
-### 3. Mejorar con IA (si está configurada)
+### 4. Generar múltiples documentos del mismo caso
 
-1. Genera primero una interconsulta
-2. Selecciona un modo de mejora:
-   - **Mejorar redacción**: Claridad y estilo sin cambiar contenido
-   - **Formatear**: Estructura y organización visual
-   - **Resumir**: Versión más concisa
-3. La IA mejorará la redacción **sin modificar información clínica**
+1. Genera el primer documento
+2. Pulsa el menú "Multi-Documento" (icono de documentos apilados)
+3. Selecciona el siguiente tipo de documento
+4. Los datos del paciente se mantienen
 
-### 4. Configuración
+### 5. Revisar con checklist
+
+1. Genera un documento
+2. Ve a la pestaña "Checklist" en el panel de resultado
+3. Marca los items conforme los revisas
+4. El progreso se muestra en el badge de la pestaña
+
+### 6. Ver cambios de la IA
+
+1. Genera un documento y aplica mejora con IA
+2. Aparecerá la pestaña "Cambios IA"
+3. Verás el diff visual: verde = añadido, rojo = eliminado
+
+### 7. Ver analítica de uso
+
+1. Accede a `/analitica` desde el enlace del footer
+2. Verás:
+   - Total de documentos generados
+   - Tiempo estimado ahorrado
+   - Desglose por servicio y tipo
+   - Gráfica de últimos 7 días
+
+### 8. Configuración
 
 Accede a `/configuracion` para:
 
-- Editar la lista de servicios destino
-- Personalizar la plantilla de interconsulta
-- Configurar webhooks
-- Restaurar valores por defecto
+- **Branding**: Nombre y colores de tu centro
+- **Frases Rápidas**: Crear y gestionar frases predefinidas
+- **Servicios Destino**: Editar lista de especialidades
+- **Plantillas**: Personalizar formato del documento
+- **Webhooks**: Configurar integración con n8n/Zapier
+- **IA**: Ver estado de la integración con OpenAI
 
 ## Estructura del Proyecto
 
@@ -175,25 +212,34 @@ src/
 │   │   ├── hooks/                   # Webhooks (interconsulta-creada)
 │   │   ├── plantillas/              # API para gestión de plantillas
 │   │   └── servicios/               # API CRUD para servicios destino
+│   ├── analitica/                   # Página de estadísticas
 │   ├── configuracion/               # Página de configuración
 │   ├── layout.tsx                   # Layout principal
 │   ├── page.tsx                     # Página principal (generador)
 │   └── globals.css                  # Estilos globales + @media print
 ├── components/
 │   ├── InterconsultaForm.tsx        # Formulario con presets y atajos
-│   ├── GeneratedTextPanel.tsx       # Panel con copiar/imprimir/IA
+│   ├── GeneratedTextPanel.tsx       # Panel con checklist/diff/IA
 │   ├── DocumentPreview.tsx          # Vista profesional A4
 │   ├── Header.tsx                   # Cabecera de navegación
 │   └── LegalDisclaimer.tsx          # Aviso legal obligatorio
 ├── data/
 │   ├── presets.ts                   # Presets por especialidad
+│   ├── checklists.ts                # Checklists de revisión
 │   └── default-config.ts            # Configuración por defecto
 ├── lib/
 │   ├── server/
 │   │   └── configRepo.ts            # Repositorio servidor (FS/JSON)
 │   ├── ai.ts                        # Capa IA con manejo de errores
+│   ├── analytics.ts                 # Sistema de analítica
+│   ├── branding.ts                  # Configuración de branding
+│   ├── caseManager.ts               # Gestión multi-documento
+│   ├── frasesRapidas.ts             # Biblioteca de frases
+│   ├── historial.ts                 # Historial de documentos
+│   ├── quickMode.ts                 # Modo consulta rápida
 │   ├── storage.ts                   # Utilidades cliente
 │   ├── templateEngine.ts            # Motor de plantillas
+│   ├── textDiff.ts                  # Comparación de textos
 │   └── validation.ts                # Validaciones del formulario
 └── types/
     └── index.ts                     # Tipos TypeScript del dominio
@@ -253,7 +299,7 @@ npm run test:coverage
 
 ## Aviso Legal Importante
 
-> **Este sistema genera borradores de interconsulta. El contenido debe ser revisado y validado por el médico responsable antes de su uso. La decisión clínica recae siempre en el profesional sanitario.**
+> **Este sistema genera borradores de documentos clínicos. El contenido debe ser revisado y validado por el médico responsable antes de su uso. La decisión clínica recae siempre en el profesional sanitario.**
 
 ### Principios éticos y legales
 
@@ -263,12 +309,18 @@ npm run test:coverage
 - La mejora con IA solo modifica redacción, **NO añade diagnósticos ni datos clínicos**
 - El médico es siempre el responsable final del documento
 
+### Privacidad
+
+- Los datos clínicos **NO se envían a servidores** (excepto mejora con IA si está activada)
+- La analítica de uso se guarda localmente en el navegador
+- Los webhooks solo envían datos si el usuario los configura explícitamente
+
 ## Limitaciones
 
 - **Sin autenticación**: No hay sistema de login (preparado para multi-tenant)
 - **Persistencia básica**: Datos en JSON/FS (preparado para Prisma/PostgreSQL)
 - **Sin integración HIS**: No se conecta con sistemas hospitalarios
-- **Sin almacenamiento de pacientes**: Los datos clínicos no se guardan
+- **Sin almacenamiento de pacientes**: Los datos clínicos no se guardan en servidor
 
 ## Evolución Futura
 
@@ -283,17 +335,11 @@ npm run test:coverage
    - Base de datos PostgreSQL con Prisma
    - Historial de interconsultas generadas (anonimizado)
 
-3. **Más tipos de documentos**
-   - Informes de alta
-   - Peticiones de pruebas diagnósticas
-   - Informes para trabajo social
-   - Certificados médicos
-
-4. **Plantillas por hospital/servicio**
+3. **Plantillas por hospital/servicio**
    - Diferentes formatos según centro
    - Plantillas compartidas entre usuarios
 
-5. **Integración con HIS**
+4. **Integración con HIS**
    - Conexión con sistemas hospitalarios
    - Importación de datos del paciente
 
@@ -313,4 +359,4 @@ Proyecto privado. Todos los derechos reservados.
 
 ---
 
-**Desarrollado para profesionales sanitarios** | v2.0
+**Desarrollado para profesionales sanitarios** | v3.0
