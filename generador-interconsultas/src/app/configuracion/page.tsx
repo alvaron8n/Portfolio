@@ -6,16 +6,19 @@
  * Permite al usuario:
  * - Editar la lista de servicios destino
  * - Editar la plantilla de interconsulta
+ * - Configurar webhooks para integración con n8n/Zapier
  * - Restaurar configuración por defecto
  *
  * Toda la persistencia se realiza a través de las APIs:
  * - /api/servicios
  * - /api/plantillas
+ * - /api/hooks/interconsulta-creada (webhook)
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { getPlaceholdersDisponibles, validarPlantilla } from '@/lib/templateEngine';
 import { ServicioDestino, PlantillaConfig, TipoDocumento } from '@/types';
+import { getConfiguracion, saveConfiguracion } from '@/lib/storage';
 
 // Tipos de documento disponibles (para futuras extensiones)
 const TIPOS_DOCUMENTO: { value: TipoDocumento; label: string }[] = [
@@ -37,6 +40,11 @@ export default function ConfiguracionPage() {
   const [plantillaEditada, setPlantillaEditada] = useState('');
   const [cargandoPlantilla, setCargandoPlantilla] = useState(true);
   const [erroresPlantilla, setErroresPlantilla] = useState<string[]>([]);
+
+  // Estado de webhooks
+  const [webhookEnabled, setWebhookEnabled] = useState(false);
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhookStatus, setWebhookStatus] = useState<'unknown' | 'configured' | 'not_configured'>('unknown');
 
   // Estado global
   const [guardando, setGuardando] = useState(false);
@@ -91,11 +99,43 @@ export default function ConfiguracionPage() {
     }
   }, [mostrarMensaje]);
 
+  // Cargar configuración de webhooks
+  const cargarWebhookConfig = useCallback(async () => {
+    try {
+      // Cargar configuración local
+      const config = getConfiguracion();
+      setWebhookEnabled(config.webhookEnabled || false);
+      setWebhookUrl(config.webhookUrl || '');
+
+      // Verificar estado del servidor
+      const response = await fetch('/api/hooks/interconsulta-creada');
+      const data = await response.json();
+      setWebhookStatus(data.configured ? 'configured' : 'not_configured');
+    } catch {
+      setWebhookStatus('not_configured');
+    }
+  }, []);
+
+  // Guardar configuración de webhooks
+  const handleSaveWebhook = () => {
+    try {
+      const config = getConfiguracion();
+      config.webhookEnabled = webhookEnabled;
+      config.webhookUrl = webhookUrl;
+      saveConfiguracion(config);
+      mostrarMensaje('success', 'Configuración de webhook guardada');
+    } catch (error) {
+      console.error('Error guardando webhook:', error);
+      mostrarMensaje('error', 'Error al guardar la configuración de webhook');
+    }
+  };
+
   // Cargar datos al montar
   useEffect(() => {
     cargarServicios();
     cargarPlantilla(tipoDocumentoSeleccionado);
-  }, [cargarServicios, cargarPlantilla, tipoDocumentoSeleccionado]);
+    cargarWebhookConfig();
+  }, [cargarServicios, cargarPlantilla, tipoDocumentoSeleccionado, cargarWebhookConfig]);
 
   // Añadir nuevo servicio
   const handleAddServicio = async () => {
@@ -497,9 +537,89 @@ export default function ConfiguracionPage() {
           </button>
         </section>
 
+        {/* Sección: Webhooks */}
+        <section className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Webhooks / n8n
+            </h2>
+            <span className={`px-2 py-1 text-xs rounded-full ${
+              webhookStatus === 'configured'
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400'
+                : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+            }`}>
+              {webhookStatus === 'configured' ? 'Servidor configurado' : 'No configurado en servidor'}
+            </span>
+          </div>
+
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Envía automáticamente los documentos generados a sistemas externos como n8n, Zapier o Make.
+          </p>
+
+          <div className="space-y-4">
+            {/* Toggle de activación */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <div>
+                <p className="font-medium text-gray-900 dark:text-gray-100">Activar webhooks</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Enviar datos cuando se genera un documento
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={webhookEnabled}
+                  onChange={e => setWebhookEnabled(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+
+            {/* URL del webhook (solo visible si está activado) */}
+            {webhookEnabled && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  URL del Webhook (opcional, solo para testing local)
+                </label>
+                <input
+                  type="url"
+                  value={webhookUrl}
+                  onChange={e => setWebhookUrl(e.target.value)}
+                  placeholder="https://your-n8n-instance.com/webhook/..."
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  La URL principal se configura en el servidor con WEBHOOK_URL en .env.local
+                </p>
+              </div>
+            )}
+
+            <button
+              onClick={handleSaveWebhook}
+              disabled={guardando}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Guardar configuración
+            </button>
+          </div>
+
+          {/* Información sobre configuración del servidor */}
+          <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-800 dark:text-blue-300">
+            <p className="font-medium">Configuración del servidor:</p>
+            <p className="mt-1">
+              Para que los webhooks funcionen, configure las variables en <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">.env.local</code>:
+            </p>
+            <pre className="mt-2 p-2 bg-blue-100 dark:bg-blue-800/50 rounded text-xs overflow-x-auto">
+{`WEBHOOK_URL=https://your-n8n.com/webhook/xxx
+WEBHOOK_SECRET=your-secret-key`}
+            </pre>
+          </div>
+        </section>
+
         {/* Información sobre IA */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <section className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             Integración con IA
           </h2>
           <p className="text-sm text-gray-600 mb-4">

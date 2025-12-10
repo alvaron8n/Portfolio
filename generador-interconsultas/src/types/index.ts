@@ -120,6 +120,10 @@ export interface ConfiguracionSistema {
 
   // Plantillas organizadas por tipo (nueva estructura preferida)
   plantillasPorTipo?: PlantillasPorTipo;
+
+  // Configuración de webhooks/n8n
+  webhookEnabled?: boolean;
+  webhookUrl?: string;
 }
 
 /**

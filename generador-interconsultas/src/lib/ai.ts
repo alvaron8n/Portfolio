@@ -1,21 +1,22 @@
 /**
  * Capa de servicio para integración con IA
  *
- * Actualmente usa OpenAI, pero diseñado para poder cambiar de proveedor.
- * El proveedor se puede cambiar modificando solo este archivo.
+ * Soporta múltiples modos de mejora:
+ * - improve: Mejora redacción y claridad
+ * - format: Reestructura en formato profesional
+ * - summarize: Genera resumen conciso
  *
  * Configuración y límites:
  * - Modelo: gpt-4o-mini (económico y rápido)
  * - Límite de entrada: 10,000 caracteres
  * - Límite de salida: 2,000 tokens (~8,000 caracteres)
  * - Timeout: 30 segundos
- *
- * Para multi-tenant con rate limiting, considerar:
- * - Redis para tracking de uso por tenant
- * - Límites diarios/mensuales por plan
  */
 
 import OpenAI from 'openai';
+
+// Tipos de modo de IA
+export type AIMode = 'improve' | 'format' | 'summarize';
 
 // Constantes de configuración
 const AI_CONFIG = {
@@ -47,10 +48,11 @@ export class AIError extends Error {
   }
 }
 
-// Prompt del sistema para mejorar interconsultas
-const SYSTEM_PROMPT = `Eres un asistente especializado en documentación médica española.
+// Prompts del sistema según el modo
+const SYSTEM_PROMPTS: Record<AIMode, string> = {
+  improve: `Eres un asistente especializado en documentación médica española.
 
-Tu tarea es mejorar la redacción de interconsultas médicas siguiendo estas reglas ESTRICTAS:
+Tu tarea es mejorar la redacción de documentos médicos siguiendo estas reglas ESTRICTAS:
 
 1. SOLO mejora la redacción, claridad, ortografía y estructura del texto.
 2. NUNCA añadas diagnósticos, datos clínicos, síntomas o información que no esté en el texto original.
@@ -62,7 +64,45 @@ Tu tarea es mejorar la redacción de interconsultas médicas siguiendo estas reg
 8. Corrige errores ortográficos y gramaticales.
 9. Elimina redundancias sin perder información.
 
-El texto mejorado debe ser prácticamente idéntico en contenido al original, solo mejor redactado.`;
+El texto mejorado debe ser prácticamente idéntico en contenido al original, solo mejor redactado.`,
+
+  format: `Eres un asistente especializado en formateo de documentación médica española.
+
+Tu tarea es reestructurar el texto en un formato profesional de informe médico:
+
+1. Organiza el contenido en secciones claramente definidas con encabezados.
+2. Usa formato de lista cuando sea apropiado (síntomas, antecedentes, medicamentos).
+3. Mantén TODA la información clínica original sin modificar.
+4. NUNCA añadas información que no esté en el original.
+5. Usa terminología médica estándar.
+6. Aplica un estilo formal y profesional.
+7. Estructura típica: Datos del paciente, Motivo, Antecedentes, Exploración, Diagnóstico, Tratamiento.
+8. Usa separadores visuales claros entre secciones.
+
+El resultado debe ser profesional, bien estructurado y conservar toda la información original.`,
+
+  summarize: `Eres un asistente especializado en documentación médica española.
+
+Tu tarea es crear un resumen conciso del documento médico:
+
+1. Extrae SOLO la información más relevante y esencial.
+2. Mantén los datos clínicos clave: diagnóstico, síntomas principales, tratamiento.
+3. NUNCA añadas información que no esté en el original.
+4. NUNCA omitas información crítica de seguridad del paciente.
+5. Usa un formato claro y directo.
+6. El resumen debe ser aproximadamente 1/3 del texto original.
+7. Prioriza: motivo de consulta, diagnóstico/sospecha, y plan de acción.
+8. Usa terminología médica precisa.
+
+El resumen debe permitir una comprensión rápida del caso manteniendo la información esencial.`,
+};
+
+// Prompts de usuario según el modo
+const USER_PROMPTS: Record<AIMode, string> = {
+  improve: 'Por favor, mejora la redacción del siguiente documento médico. Recuerda: SOLO mejora la redacción, NO añadas ni modifiques información clínica.',
+  format: 'Por favor, reestructura el siguiente documento médico en un formato profesional de informe. Mantén toda la información original.',
+  summarize: 'Por favor, genera un resumen conciso del siguiente documento médico. Conserva solo la información esencial.',
+};
 
 /**
  * Verifica si la IA está configurada
@@ -99,13 +139,17 @@ function validateInput(text: string): void {
 }
 
 /**
- * Mejora el texto de una interconsulta usando IA
+ * Mejora el texto de un documento médico usando IA
  *
- * @param text - Texto original de la interconsulta
- * @returns Texto mejorado
+ * @param text - Texto original del documento
+ * @param mode - Modo de mejora (improve, format, summarize)
+ * @returns Texto procesado según el modo
  * @throws AIError si hay cualquier problema
  */
-export async function enhanceInterconsultaText(text: string): Promise<string> {
+export async function enhanceInterconsultaText(
+  text: string,
+  mode: AIMode = 'improve'
+): Promise<string> {
   // Validación de configuración
   if (!process.env.OPENAI_API_KEY) {
     throw new AIError(
@@ -128,11 +172,11 @@ export async function enhanceInterconsultaText(text: string): Promise<string> {
       messages: [
         {
           role: 'system',
-          content: SYSTEM_PROMPT,
+          content: SYSTEM_PROMPTS[mode],
         },
         {
           role: 'user',
-          content: `Por favor, mejora la redacción del siguiente texto de interconsulta médica. Recuerda: SOLO mejora la redacción, NO añadas ni modifiques información clínica.\n\n${text}`,
+          content: `${USER_PROMPTS[mode]}\n\n${text}`,
         },
       ],
       temperature: AI_CONFIG.temperature,
@@ -218,6 +262,7 @@ export function getAIConfig() {
   return {
     maxInputLength: AI_CONFIG.maxInputLength,
     isConfigured: isAIConfigured(),
+    availableModes: ['improve', 'format', 'summarize'] as AIMode[],
   };
 }
 
@@ -227,7 +272,7 @@ export function getAIConfig() {
  */
 export interface AIProvider {
   isConfigured(): boolean;
-  enhanceText(text: string): Promise<string>;
+  enhanceText(text: string, mode?: AIMode): Promise<string>;
 }
 
 /**

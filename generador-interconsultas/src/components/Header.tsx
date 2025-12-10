@@ -3,7 +3,8 @@
 /**
  * Componente de cabecera de la aplicación
  *
- * Incluye navegación para diferentes tipos de documento y configuración.
+ * Incluye navegación para diferentes tipos de documento, configuración
+ * y toggle de dark mode.
  */
 
 import Link from 'next/link';
@@ -22,7 +23,29 @@ const documentTypes = [
 export default function Header() {
   const pathname = usePathname();
   const [isDocMenuOpen, setIsDocMenuOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Inicializar dark mode desde localStorage o preferencia del sistema
+  useEffect(() => {
+    const stored = localStorage.getItem('darkMode');
+    if (stored !== null) {
+      setIsDarkMode(stored === 'true');
+    } else {
+      // Usar preferencia del sistema
+      setIsDarkMode(window.matchMedia('(prefers-color-scheme: dark)').matches);
+    }
+  }, []);
+
+  // Aplicar clase dark al HTML
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('darkMode', String(isDarkMode));
+  }, [isDarkMode]);
 
   // Cerrar menú al hacer clic fuera
   useEffect(() => {
@@ -38,13 +61,18 @@ export default function Header() {
   // Obtener el documento actual
   const currentDoc = documentTypes.find(d => d.href === pathname) || documentTypes[0];
 
+  // Toggle dark mode
+  const toggleDarkMode = () => {
+    setIsDarkMode(prev => !prev);
+  };
+
   return (
-    <header className="bg-white border-b border-gray-200 print:hidden">
+    <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 print:hidden transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo / Nombre */}
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-sm">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-500 dark:to-blue-600 rounded-lg flex items-center justify-center shadow-sm">
               <svg
                 className="h-6 w-6 text-white"
                 fill="none"
@@ -60,10 +88,10 @@ export default function Header() {
               </svg>
             </div>
             <div className="hidden sm:block">
-              <h1 className="text-lg font-bold text-gray-900">
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white">
                 MediDocs
               </h1>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 Documentación médica
               </p>
             </div>
@@ -77,8 +105,8 @@ export default function Header() {
                 onClick={() => setIsDocMenuOpen(!isDocMenuOpen)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   pathname === '/' || pathname.startsWith('/documents')
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-gray-600 hover:bg-gray-100'
+                    ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
               >
                 <span>{currentDoc.icon}</span>
@@ -95,9 +123,9 @@ export default function Header() {
 
               {/* Dropdown menu */}
               {isDocMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
-                  <div className="px-3 py-2 border-b border-gray-100">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-50">
+                  <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Tipo de documento
                     </p>
                   </div>
@@ -108,8 +136,8 @@ export default function Header() {
                       onClick={() => setIsDocMenuOpen(false)}
                       className={`flex items-center gap-3 px-3 py-2 text-sm transition-colors ${
                         pathname === doc.href
-                          ? 'bg-blue-50 text-blue-700'
-                          : 'text-gray-700 hover:bg-gray-50'
+                          ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
+                          : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
                       }`}
                     >
                       <span className="text-lg">{doc.icon}</span>
@@ -117,7 +145,7 @@ export default function Header() {
                         <span className="block font-medium">{doc.label}</span>
                       </div>
                       {pathname === doc.href && (
-                        <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                       )}
@@ -132,8 +160,8 @@ export default function Header() {
               href="/configuracion"
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 pathname === '/configuracion'
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
               }`}
             >
               <span className="hidden sm:inline">Configuración</span>
@@ -157,6 +185,35 @@ export default function Header() {
                 />
               </svg>
             </Link>
+
+            {/* Dark Mode Toggle */}
+            <button
+              onClick={toggleDarkMode}
+              className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              title={isDarkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            >
+              {isDarkMode ? (
+                // Sol icon (modo claro)
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+                  />
+                </svg>
+              ) : (
+                // Luna icon (modo oscuro)
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+                  />
+                </svg>
+              )}
+            </button>
           </nav>
         </div>
       </div>
