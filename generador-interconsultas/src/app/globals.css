@@ -1,0 +1,142 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f9fafb;
+  --foreground: #111827;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+/* Estilos personalizados para el Generador de Interconsultas */
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Estilos para el texto generado */
+pre {
+  tab-size: 4;
+  font-family: var(--font-mono);
+}
+
+/* Animación de carga */
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+/* Focus visible mejorado */
+:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Transiciones suaves */
+* {
+  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Estilos de impresión */
+@media print {
+  /* Reset para impresión */
+  * {
+    transition: none !important;
+    box-shadow: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+    line-height: 1.5;
+  }
+
+  /* Ocultar elementos no necesarios en impresión */
+  .no-print,
+  header,
+  footer,
+  nav,
+  button {
+    display: none !important;
+  }
+
+  /* Mostrar solo el contenido del documento */
+  .print-area {
+    display: block !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 20mm;
+    background: white;
+  }
+
+  /* Contenedor principal para impresión */
+  pre {
+    background: white !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 11pt !important;
+    font-family: "Times New Roman", Times, serif !important;
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+    color: black !important;
+    page-break-inside: auto;
+  }
+
+  /* Configuración de página */
+  @page {
+    size: A4;
+    margin: 20mm;
+  }
+
+  /* Evitar cortes de página en medio de párrafos */
+  p, h1, h2, h3, h4, h5, h6 {
+    page-break-inside: avoid;
+    page-break-after: avoid;
+  }
+
+  /* Forzar colores para impresión */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
