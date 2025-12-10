@@ -3,8 +3,8 @@
 /**
  * Vista previa profesional del documento en formato A4
  *
- * Renderiza el documento médico con formato hospitalario profesional,
- * integrando el branding del centro y preparado para impresión.
+ * Plantilla de informe clinico hospitalario sobrio y profesional.
+ * Optimizado para impresion y aspecto de documento oficial.
  */
 
 import { useEffect, useState } from 'react';
@@ -18,54 +18,11 @@ interface DocumentPreviewProps {
 }
 
 /**
- * Parsea el texto plano y extrae las secciones
- */
-function parseDocumentSections(text: string): Record<string, string> {
-  const sections: Record<string, string> = {};
-
-  const parts = text.split(/─{10,}/);
-
-  if (parts.length > 0) {
-    const headerMatch = parts[0].match(/INTERCONSULTA AL SERVICIO DE\s+(.+)/);
-    if (headerMatch) sections.servicioDestino = headerMatch[1].trim();
-
-    const prioridadMatch = parts[0].match(/Prioridad:\s*(.+)/);
-    if (prioridadMatch) sections.prioridad = prioridadMatch[1].trim();
-
-    const fechaMatch = parts[0].match(/Fecha:\s*(.+)/);
-    if (fechaMatch) sections.fecha = fechaMatch[1].trim();
-  }
-
-  const sectionTitles = [
-    'DATOS DEL PACIENTE',
-    'MOTIVO DE LA INTERCONSULTA',
-    'ANTECEDENTES RELEVANTES',
-    'EXPLORACIÓN Y DATOS RELEVANTES',
-    'PRESUNCIÓN DIAGNÓSTICA',
-    'TRATAMIENTO ACTUAL',
-    'MÉDICO REMITENTE',
-  ];
-
-  sectionTitles.forEach(title => {
-    const regex = new RegExp(`${title}\\s*\\n\\n([\\s\\S]*?)(?=\\n\\n[A-ZÁÉÍÓÚ]|$)`, 'm');
-    const match = text.match(regex);
-    if (match) {
-      const key = title.toLowerCase().replace(/\s+/g, '_').replace(/[áéíóú]/g, c =>
-        ({ 'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u' }[c] || c)
-      );
-      sections[key] = match[1].trim();
-    }
-  });
-
-  return sections;
-}
-
-/**
  * Genera las iniciales del nombre del hospital
  */
 function getHospitalInitials(name: string): string {
-  if (!name) return 'HC';
-  const words = name.split(' ').filter(w => w.length > 2);
+  if (!name) return 'CS';
+  const words = name.split(' ').filter(w => w.length > 2 && !['de', 'del', 'la', 'el'].includes(w.toLowerCase()));
   if (words.length >= 2) {
     return (words[0][0] + words[1][0]).toUpperCase();
   }
@@ -73,14 +30,14 @@ function getHospitalInitials(name: string): string {
 }
 
 /**
- * Nombres legibles de tipos de documento
+ * Nombres de tipos de documento
  */
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
-  interconsulta: 'Interconsulta Médica',
-  informe_alta: 'Informe de Alta',
-  peticion_pruebas: 'Petición de Pruebas Diagnósticas',
-  nota_evolutiva: 'Nota de Evolución',
-  informe_social: 'Informe Social',
+  interconsulta: 'INTERCONSULTA',
+  informe_alta: 'INFORME DE ALTA',
+  peticion_pruebas: 'PETICION DE PRUEBAS',
+  nota_evolutiva: 'NOTA DE EVOLUCION',
+  informe_social: 'INFORME SOCIAL',
 };
 
 export default function DocumentPreview({
@@ -88,276 +45,282 @@ export default function DocumentPreview({
   plainText,
   documentType = 'interconsulta',
 }: DocumentPreviewProps) {
-  // Cargar branding en cliente para evitar hidratación
   const [branding, setBranding] = useState<BrandingConfig | null>(null);
   const [currentDate, setCurrentDate] = useState<string>('');
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setBranding(getBranding());
     setCurrentDate(new Date().toLocaleDateString('es-ES', {
       year: 'numeric',
-      month: 'long',
-      day: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
     }));
+    setMounted(true);
   }, []);
 
-  const hasFormData = formData && formData.paciente?.nombre;
-  const parsedSections = plainText ? parseDocumentSections(plainText) : {};
+  // No renderizar hasta estar montado (evitar hidratacion)
+  if (!mounted) {
+    return (
+      <div className="print-area a4-container" id="printable-document">
+        <div className="bg-white border border-gray-300 min-h-[600px] flex items-center justify-center">
+          <div className="animate-pulse text-gray-400 text-sm">Cargando vista previa...</div>
+        </div>
+      </div>
+    );
+  }
+
+  const hasData = formData && (formData.paciente?.nombre || formData.informacionClinica?.motivoPrincipal);
 
   // Datos del documento
-  const servicioDestino = hasFormData ? formData.servicioDestino : parsedSections.servicioDestino || '';
-  const prioridad = hasFormData ? formData.prioridad : parsedSections.prioridad || '';
-  const fecha = parsedSections.fecha || currentDate;
+  const servicioDestino = formData?.servicioDestino || '';
+  const prioridad = formData?.prioridad || 'Normal';
+  const servicioRemitente = formData?.servicioRemitente || '';
 
-  const paciente = hasFormData ? formData.paciente : {
-    nombre: parsedSections.datos_del_paciente?.match(/Nombre\/Iniciales:\s*(.+)/)?.[1] || '',
-    edad: parseInt(parsedSections.datos_del_paciente?.match(/Edad:\s*(\d+)/)?.[1] || '0'),
-    sexo: parsedSections.datos_del_paciente?.match(/Sexo:\s*(.+)/)?.[1] || '',
-    identificador: parsedSections.datos_del_paciente?.match(/Nº Historia Clínica:\s*(.+)/)?.[1] || '',
-  };
-
-  const infoClinica = hasFormData ? formData.informacionClinica : {
-    motivoPrincipal: parsedSections.motivo_de_la_interconsulta || '',
-    antecedentesRelevantes: parsedSections.antecedentes_relevantes || '',
-    exploracionDatosRelevantes: parsedSections.exploracion_y_datos_relevantes || '',
-    presuncionDiagnostica: parsedSections.presuncion_diagnostica || '',
-    tratamientoActual: parsedSections.tratamiento_actual || '',
-  };
-
-  const medico = hasFormData ? formData.medico : {
+  const paciente = formData?.paciente || {
     nombre: '',
-    servicio: formData?.servicioRemitente || '',
+    edad: 0,
+    sexo: 'No especificado',
+    identificador: '',
+  };
+
+  const infoClinica = formData?.informacionClinica || {
+    motivoPrincipal: '',
+    antecedentesRelevantes: '',
+    exploracionDatosRelevantes: '',
+    presuncionDiagnostica: '',
+    tratamientoActual: '',
+  };
+
+  const medico = formData?.medico || {
+    nombre: '',
+    servicio: '',
     numeroColegiado: '',
     centro: '',
   };
 
-  const servicioRemitente = hasFormData ? formData.servicioRemitente : '';
-
-  // Colores y estilos
-  const primaryColor = branding?.colorPrincipal || '#1e40af';
+  // Branding con defaults sobrios
+  const primaryColor = branding?.colorPrincipal || '#1f2937';
   const isDark = isColorDark(primaryColor);
-  const hospitalName = branding?.nombreCentro || 'Hospital Clínico';
-  const hospitalSubtitle = branding?.subtitulo || 'Servicio de Documentación Clínica';
-  const showBrandingInDoc = branding?.mostrarEnDocumentos !== false;
+  const hospitalName = branding?.nombreCentro || 'Centro Sanitario';
+  const hospitalSubtitle = branding?.subtitulo || '';
+  const showBranding = branding?.mostrarEnDocumentos !== false;
 
-  // Badge de prioridad
-  const prioridadConfig = {
-    'Urgente': { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' },
-    'Preferente': { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-300' },
-    'Normal': { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300' },
-  }[prioridad] || { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300' };
+  // Generar color mas claro para acentos (desaturado)
+  const accentColor = primaryColor;
 
   return (
     <div className="print-area a4-container" id="printable-document">
-      {/* Documento A4 */}
-      <div className="bg-white shadow-lg border border-gray-200 rounded-lg overflow-hidden">
-        {/* ====== CABECERA HOSPITALARIA ====== */}
-        <header
-          className="px-6 py-5 text-white print-header"
-          style={{ backgroundColor: primaryColor }}
-        >
-          <div className="flex items-start justify-between gap-4">
-            {/* Logo + Info del hospital */}
-            <div className="flex items-center gap-4">
-              {/* Logo o Iniciales */}
-              {showBrandingInDoc && (
-                <div
-                  className={`w-14 h-14 rounded-lg flex items-center justify-center font-bold text-xl ${
-                    isDark ? 'bg-white/20' : 'bg-black/10'
-                  }`}
-                >
-                  {branding?.logoUrl ? (
-                    <img
-                      src={branding.logoUrl}
-                      alt=""
-                      className="w-12 h-12 object-contain rounded"
-                    />
-                  ) : (
-                    <span className={isDark ? 'text-white' : 'text-gray-900'}>
-                      {getHospitalInitials(hospitalName)}
-                    </span>
-                  )}
-                </div>
-              )}
+      {/* Documento A4 - Estilo informe oficial */}
+      <div className="bg-white border border-gray-300 print:border-0 print:shadow-none">
 
-              <div>
-                {showBrandingInDoc && (
+        {/* === CABECERA === */}
+        <header className="border-b-2 border-gray-800 print-header">
+          <div className="px-6 py-4">
+            <div className="flex items-start justify-between">
+              {/* Izquierda: Logo/Iniciales + Nombre Hospital */}
+              <div className="flex items-center gap-3">
+                {showBranding && (
                   <>
-                    <h1 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      {hospitalName}
-                    </h1>
-                    <p className={`text-sm ${isDark ? 'text-white/80' : 'text-gray-700'}`}>
-                      {hospitalSubtitle}
-                    </p>
+                    {branding?.logoUrl ? (
+                      <img
+                        src={branding.logoUrl}
+                        alt=""
+                        className="h-10 w-10 object-contain"
+                      />
+                    ) : (
+                      <div
+                        className="h-10 w-10 flex items-center justify-center text-sm font-bold border-2 rounded"
+                        style={{
+                          borderColor: primaryColor,
+                          color: primaryColor,
+                        }}
+                      >
+                        {getHospitalInitials(hospitalName)}
+                      </div>
+                    )}
+                    <div>
+                      <h1
+                        className="text-base font-bold uppercase tracking-wide"
+                        style={{ color: primaryColor }}
+                      >
+                        {hospitalName}
+                      </h1>
+                      {hospitalSubtitle && (
+                        <p className="text-xs text-gray-500">{hospitalSubtitle}</p>
+                      )}
+                    </div>
                   </>
                 )}
-                <p className={`text-xs mt-1 uppercase tracking-wider font-semibold ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
-                  {DOCUMENT_TYPE_LABELS[documentType] || 'Documento Clínico'}
-                </p>
+                {!showBranding && (
+                  <div className="text-base font-bold uppercase tracking-wide text-gray-800">
+                    Documento Clinico
+                  </div>
+                )}
               </div>
-            </div>
 
-            {/* Fecha y Prioridad */}
-            <div className="text-right shrink-0">
-              <p className={`text-sm ${isDark ? 'text-white/80' : 'text-gray-700'}`}>
-                {fecha}
-              </p>
-              {prioridad && (
-                <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-semibold border ${prioridadConfig.bg} ${prioridadConfig.text} ${prioridadConfig.border}`}>
-                  {prioridad}
-                </span>
-              )}
+              {/* Derecha: Tipo documento + Fecha */}
+              <div className="text-right">
+                <div
+                  className="text-xs font-bold uppercase tracking-wider"
+                  style={{ color: primaryColor }}
+                >
+                  {DOCUMENT_TYPE_LABELS[documentType]}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  Fecha: {currentDate}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Servicio destino */}
+          {/* Barra de servicio destino + prioridad */}
           {servicioDestino && (
-            <div className={`mt-4 pt-4 border-t ${isDark ? 'border-white/20' : 'border-black/10'}`}>
-              <p className={`text-xs uppercase tracking-wider ${isDark ? 'text-white/60' : 'text-gray-600'}`}>
-                Servicio Destino
-              </p>
-              <p className={`text-xl font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                {servicioDestino}
-              </p>
+            <div
+              className="px-6 py-2 flex items-center justify-between"
+              style={{ backgroundColor: primaryColor }}
+            >
+              <div className={isDark ? 'text-white' : 'text-gray-900'}>
+                <span className="text-xs uppercase tracking-wide opacity-80">Servicio destino: </span>
+                <span className="text-sm font-semibold">{servicioDestino}</span>
+              </div>
+
+              {/* Badge prioridad */}
+              <span className={`
+                px-2 py-0.5 text-xs font-semibold rounded border
+                ${prioridad === 'Urgente'
+                  ? 'bg-red-600 text-white border-red-700'
+                  : prioridad === 'Preferente'
+                    ? 'bg-amber-500 text-white border-amber-600'
+                    : 'bg-green-600 text-white border-green-700'
+                }
+              `}>
+                {prioridad.toUpperCase()}
+              </span>
             </div>
           )}
         </header>
 
-        {/* ====== CONTENIDO DEL DOCUMENTO ====== */}
-        <div className="p-6 space-y-5">
-          {/* Datos del Paciente */}
+        {/* === CONTENIDO === */}
+        <div className="px-6 py-5 space-y-4 text-sm">
+
+          {/* DATOS DEL PACIENTE */}
           <section>
-            <h2 className="text-xs font-semibold tracking-wider uppercase text-gray-500 mb-3 flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
+            <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200 pb-1 mb-2">
               Datos del Paciente
             </h2>
-            <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-4 gap-x-4 gap-y-1">
               <div>
-                <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Nombre/Iniciales</p>
-                <p className="text-sm font-medium text-gray-900">{paciente.nombre || '-'}</p>
+                <span className="text-[10px] uppercase text-gray-400">Nombre/Iniciales</span>
+                <p className="font-medium text-gray-900">{paciente.nombre || '—'}</p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Edad</p>
-                <p className="text-sm font-medium text-gray-900">{paciente.edad ? `${paciente.edad} años` : '-'}</p>
+                <span className="text-[10px] uppercase text-gray-400">Edad</span>
+                <p className="font-medium text-gray-900">
+                  {paciente.edad ? `${paciente.edad} años` : '—'}
+                </p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Sexo</p>
-                <p className="text-sm font-medium text-gray-900">{paciente.sexo || '-'}</p>
+                <span className="text-[10px] uppercase text-gray-400">Sexo</span>
+                <p className="font-medium text-gray-900">
+                  {paciente.sexo !== 'No especificado' ? paciente.sexo : '—'}
+                </p>
               </div>
-              {paciente.identificador && (
-                <div>
-                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">N Historia</p>
-                  <p className="text-sm font-medium text-gray-900">{paciente.identificador}</p>
-                </div>
-              )}
+              <div>
+                <span className="text-[10px] uppercase text-gray-400">N Historia</span>
+                <p className="font-medium text-gray-900">{paciente.identificador || '—'}</p>
+              </div>
             </div>
           </section>
 
-          {/* Motivo de la Interconsulta */}
+          {/* MOTIVO DE LA INTERCONSULTA */}
           {infoClinica.motivoPrincipal && (
             <section>
-              <h2 className="text-xs font-semibold tracking-wider uppercase text-gray-500 mb-3 flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+              <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200 pb-1 mb-2">
                 Motivo de la Interconsulta
               </h2>
               <div
-                className="bg-blue-50 border-l-4 p-4 rounded-r-lg"
-                style={{ borderLeftColor: primaryColor }}
+                className="pl-3 border-l-2 py-1"
+                style={{ borderLeftColor: accentColor }}
               >
-                <p className="text-sm leading-relaxed text-gray-800 whitespace-pre-wrap">
+                <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
                   {infoClinica.motivoPrincipal}
                 </p>
               </div>
             </section>
           )}
 
-          {/* Antecedentes Relevantes */}
+          {/* ANTECEDENTES RELEVANTES */}
           {infoClinica.antecedentesRelevantes && (
             <section>
-              <h2 className="text-xs font-semibold tracking-wider uppercase text-gray-500 mb-3">
+              <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200 pb-1 mb-2">
                 Antecedentes Relevantes
               </h2>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm leading-relaxed text-gray-800 whitespace-pre-wrap">
-                  {infoClinica.antecedentesRelevantes}
-                </p>
-              </div>
+              <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
+                {infoClinica.antecedentesRelevantes}
+              </p>
             </section>
           )}
 
-          {/* Exploración y Datos Relevantes */}
+          {/* EXPLORACION Y DATOS RELEVANTES */}
           {infoClinica.exploracionDatosRelevantes && (
             <section>
-              <h2 className="text-xs font-semibold tracking-wider uppercase text-gray-500 mb-3">
-                Exploración y Datos Relevantes
+              <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200 pb-1 mb-2">
+                Exploracion y Datos Relevantes
               </h2>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm leading-relaxed text-gray-800 whitespace-pre-wrap">
-                  {infoClinica.exploracionDatosRelevantes}
-                </p>
-              </div>
+              <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
+                {infoClinica.exploracionDatosRelevantes}
+              </p>
             </section>
           )}
 
-          {/* Presunción Diagnóstica */}
+          {/* PRESUNCION DIAGNOSTICA */}
           {infoClinica.presuncionDiagnostica && (
             <section>
-              <h2 className="text-xs font-semibold tracking-wider uppercase text-gray-500 mb-3 flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                Presunción Diagnóstica
+              <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200 pb-1 mb-2">
+                Presuncion Diagnostica
               </h2>
-              <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg">
-                <p className="text-sm leading-relaxed text-gray-800 whitespace-pre-wrap">
+              <div className="pl-3 border-l-2 border-amber-400 py-1 bg-amber-50 print:bg-transparent">
+                <p className="text-gray-800 leading-relaxed whitespace-pre-wrap font-medium">
                   {infoClinica.presuncionDiagnostica}
                 </p>
               </div>
             </section>
           )}
 
-          {/* Tratamiento Actual */}
+          {/* TRATAMIENTO ACTUAL */}
           {infoClinica.tratamientoActual && (
             <section>
-              <h2 className="text-xs font-semibold tracking-wider uppercase text-gray-500 mb-3 flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                </svg>
+              <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200 pb-1 mb-2">
                 Tratamiento Actual
               </h2>
-              <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
-                <p className="text-sm leading-relaxed text-gray-800 whitespace-pre-wrap">
-                  {infoClinica.tratamientoActual}
-                </p>
-              </div>
+              <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
+                {infoClinica.tratamientoActual}
+              </p>
             </section>
           )}
 
-          {/* Separador */}
-          <hr className="border-gray-200 my-4" />
+          {/* SEPARADOR */}
+          <hr className="border-gray-300 my-3" />
 
-          {/* Médico Remitente */}
-          <section className="bg-gray-50 rounded-lg p-4">
-            <h2 className="text-xs font-semibold tracking-wider uppercase text-gray-500 mb-3 flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Médico Remitente
+          {/* MEDICO REMITENTE */}
+          <section className="bg-gray-50 print:bg-transparent p-3 border border-gray-200">
+            <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2">
+              Medico Remitente
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-medium text-gray-900">{medico.nombre || '-'}</p>
+                <p className="font-semibold text-gray-900">{medico.nombre || '—'}</p>
                 {servicioRemitente && (
-                  <p className="text-xs text-gray-500">{servicioRemitente}</p>
+                  <p className="text-xs text-gray-600">{servicioRemitente}</p>
+                )}
+                {medico.servicio && !servicioRemitente && (
+                  <p className="text-xs text-gray-600">{medico.servicio}</p>
                 )}
               </div>
-              <div className="text-xs text-gray-500 space-y-0.5">
+              <div className="text-right text-xs text-gray-500">
                 {medico.numeroColegiado && (
-                  <p>N Colegiado: {medico.numeroColegiado}</p>
+                  <p>N Col.: {medico.numeroColegiado}</p>
                 )}
                 {medico.centro && (
                   <p>{medico.centro}</p>
@@ -367,15 +330,25 @@ export default function DocumentPreview({
           </section>
         </div>
 
-        {/* ====== PIE DEL DOCUMENTO ====== */}
-        <footer className="px-6 py-4 border-t border-gray-200 bg-gray-50 print-footer">
-          <p className="text-[10px] text-gray-400 text-center italic leading-relaxed">
-            Este documento es un borrador generado automaticamente.
-            Debe ser revisado y validado por el profesional sanitario antes de su uso.
-            No constituye un documento clinico oficial hasta su validacion.
+        {/* === PIE === */}
+        <footer className="px-6 py-3 border-t border-gray-300 print-footer">
+          <p className="text-[9px] text-gray-400 text-center leading-relaxed">
+            Documento generado automaticamente. Requiere validacion del profesional sanitario responsable antes de su uso clinico.
           </p>
         </footer>
       </div>
+
+      {/* Mensaje cuando no hay datos */}
+      {!hasData && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/90">
+          <div className="text-center text-gray-400">
+            <svg className="mx-auto h-12 w-12 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <p className="text-sm">Complete el formulario para ver la vista previa</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

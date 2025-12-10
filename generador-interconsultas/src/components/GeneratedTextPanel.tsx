@@ -361,15 +361,15 @@ export default function GeneratedTextPanel({
       )}
 
       {/* Contenido según pestaña activa - área con scroll */}
-      <div className="flex-1 min-h-[300px] max-h-[calc(100vh-420px)] overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+      <div className="flex-1 min-h-[300px] overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
         {activeTab === 'plain' && (
-          <pre className="h-full overflow-y-auto p-4 text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap font-mono print:bg-white print:border-none">
+          <pre className="h-full max-h-[calc(100vh-320px)] overflow-y-auto p-4 text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap font-mono print:bg-white print:border-none">
             {text}
           </pre>
         )}
 
         {activeTab === 'preview' && (
-          <div className="h-full overflow-y-auto p-3 sm:p-4 bg-slate-100 dark:bg-slate-800">
+          <div className="h-full max-h-[calc(100vh-320px)] overflow-y-auto p-3 sm:p-4 bg-slate-100 dark:bg-slate-800">
             <DocumentPreview
               formData={formData}
               plainText={text}
@@ -379,7 +379,7 @@ export default function GeneratedTextPanel({
         )}
 
         {activeTab === 'checklist' && (
-          <div className="h-full overflow-y-auto p-4">
+          <div className="h-full max-h-[calc(100vh-320px)] overflow-y-auto p-4">
             <div className="space-y-3">
               {/* Progress bar */}
               <div className="mb-4">
@@ -463,7 +463,7 @@ export default function GeneratedTextPanel({
         )}
 
         {activeTab === 'diff' && diffResult && (
-          <div className="h-full overflow-y-auto p-4">
+          <div className="h-full max-h-[calc(100vh-320px)] overflow-y-auto p-4">
             {/* Stats de cambios */}
             <div className="mb-4 flex flex-wrap gap-3">
               <div className="flex items-center gap-2 px-3 py-1.5 bg-green-100 dark:bg-green-900/30 rounded-lg">

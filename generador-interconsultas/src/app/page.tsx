@@ -1,14 +1,13 @@
 'use client';
 
 /**
- * Página principal: Generador de Interconsultas
+ * Generador de Interconsultas Clinicas
  *
- * UI profesional estilo software clínico con:
- * - Barra de cabecera compacta con branding
- * - Barra de métricas de sesión
- * - Modo Consulta Rápida
- * - Formulario estructurado
- * - Panel de documento generado
+ * UI profesional estilo software medico con:
+ * - Cabecera compacta
+ * - Barra de metricas discreta
+ * - Layout de dos columnas
+ * - Soporte responsive y dark mode
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -39,27 +38,29 @@ export default function HomePage() {
   const [quickMode, setQuickMode] = useState(false);
   const [autoDraft, setAutoDraft] = useState('');
 
-  // Multi-Doc Wizard
+  // Multi-Doc
   const [showMultiDocMenu, setShowMultiDocMenu] = useState(false);
 
-  // Branding & Stats (client-side only)
+  // Client-side data (loaded after mount)
   const [branding, setBranding] = useState<ReturnType<typeof getBranding> | null>(null);
   const [stats, setStats] = useState<ReturnType<typeof getEstadisticasGenerales> | null>(null);
   const [tiempoAhorrado, setTiempoAhorrado] = useState<ReturnType<typeof getTiempoAhorradoEstimado> | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   // Success message
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Load client-side data after mount (avoid hydration mismatch)
+  // Load client-side data after mount
   useEffect(() => {
     const config = getQuickModeConfig();
     setQuickMode(config.enabled);
     setBranding(getBranding());
     setStats(getEstadisticasGenerales());
     setTiempoAhorrado(getTiempoAhorradoEstimado());
+    setMounted(true);
   }, []);
 
-  // Verificar si la IA está disponible al cargar
+  // Check AI availability
   useEffect(() => {
     async function checkAI() {
       try {
@@ -84,10 +85,6 @@ export default function HomePage() {
         e.preventDefault();
         handleSaveDraft();
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
-        e.preventDefault();
-        handleClearForm();
-      }
     };
 
     document.addEventListener('keydown', handleKeyDown);
@@ -103,16 +100,8 @@ export default function HomePage() {
     if (!formData) return;
     const titulo = generateTitulo('interconsulta', formData.paciente.nombre, formData.servicioDestino);
     addToHistorial('interconsulta', titulo, formData as unknown as Record<string, unknown>, generatedText);
-    showSuccess('Borrador guardado en historial');
+    showSuccess('Borrador guardado');
   }, [formData, generatedText]);
-
-  const handleClearForm = useCallback(() => {
-    if (formData && (formData.paciente.nombre || formData.informacionClinica.motivoPrincipal)) {
-      if (confirm('Limpiar todos los campos del formulario?')) {
-        window.location.reload();
-      }
-    }
-  }, [formData]);
 
   const showSuccess = (message: string) => {
     setSuccessMessage(message);
@@ -140,12 +129,12 @@ export default function HomePage() {
 
       const result = await response.json();
       if (!result.success) {
-        setWebhookWarning('Documento generado, pero no se pudo enviar al webhook externo.');
-        setTimeout(() => setWebhookWarning(null), 8000);
+        setWebhookWarning('Documento generado. Error al enviar al webhook.');
+        setTimeout(() => setWebhookWarning(null), 5000);
       }
     } catch {
-      setWebhookWarning('Documento generado, pero error de conexion con el webhook.');
-      setTimeout(() => setWebhookWarning(null), 8000);
+      setWebhookWarning('Documento generado. Error de conexion con webhook.');
+      setTimeout(() => setWebhookWarning(null), 5000);
     }
   };
 
@@ -166,14 +155,13 @@ export default function HomePage() {
       addToHistorial('interconsulta', titulo, data as unknown as Record<string, unknown>, text);
       await sendToWebhook(data, text);
 
-      // Update stats
       setStats(getEstadisticasGenerales());
       setTiempoAhorrado(getTiempoAhorradoEstimado());
 
-      showSuccess('Documento generado correctamente');
+      showSuccess('Documento generado');
     } catch (err) {
-      console.error('Error al generar interconsulta:', err);
-      setError('Error al generar el texto. Por favor, intentelo de nuevo.');
+      console.error('Error al generar:', err);
+      setError('Error al generar el documento.');
     } finally {
       setLoading(false);
     }
@@ -192,15 +180,15 @@ export default function HomePage() {
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Error al mejorar el texto');
+      if (!response.ok) throw new Error(data.error || 'Error al mejorar');
 
       setGeneratedText(data.text);
       if (formData) {
         trackDocumentGenerated('interconsulta', formData.servicioDestino, data.text.length, true);
       }
     } catch (err) {
-      console.error('Error al mejorar con IA:', err);
-      setError(err instanceof Error ? err.message : 'Error al mejorar el texto con IA.');
+      console.error('Error IA:', err);
+      setError(err instanceof Error ? err.message : 'Error al mejorar con IA.');
     } finally {
       setEnhancing(false);
     }
@@ -220,66 +208,60 @@ export default function HomePage() {
     setShowMultiDocMenu(true);
   };
 
-  // Get branding colors (with defaults for SSR)
-  const brandColor = branding?.colorPrincipal || '#1e40af';
+  // Branding colors
+  const brandColor = branding?.colorPrincipal || '#1e3a5f';
   const textOnBrand = isColorDark(brandColor) ? 'text-white' : 'text-gray-900';
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-gray-900">
-      {/* Compact Header Bar */}
-      <header
-        className="border-b border-gray-200 dark:border-gray-700 print:hidden"
-        style={{ backgroundColor: brandColor }}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+      {/* ===== CABECERA ===== */}
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 print:hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-14">
-            {/* Left: Branding */}
+            {/* Logo + Titulo */}
             <div className="flex items-center gap-3">
-              {branding && hasBranding() && branding.mostrarEnHeader && branding.logoUrl ? (
-                <img src={branding.logoUrl} alt="" className="h-8 w-8 rounded" />
-              ) : (
-                <div className={`h-8 w-8 rounded flex items-center justify-center bg-white/20 ${textOnBrand}`}>
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-              )}
-              <div>
-                <h1 className={`text-sm font-semibold ${textOnBrand}`}>
-                  {branding?.nombreCentro || 'Generador de Documentos'}
-                </h1>
-                {branding?.subtitulo && (
-                  <p className={`text-xs ${textOnBrand} opacity-75`}>{branding.subtitulo}</p>
+              <div
+                className="h-8 w-8 rounded flex items-center justify-center text-xs font-bold"
+                style={{ backgroundColor: brandColor, color: isColorDark(brandColor) ? 'white' : '#1f2937' }}
+              >
+                {mounted && branding?.logoUrl ? (
+                  <img src={branding.logoUrl} alt="" className="h-6 w-6 object-contain" />
+                ) : (
+                  <span>IC</span>
                 )}
+              </div>
+              <div className="hidden sm:block">
+                <h1 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  Generador de Interconsultas
+                </h1>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                  Documentacion clinica estandarizada
+                </p>
               </div>
             </div>
 
-            {/* Center: Document Type */}
-            <div className={`hidden sm:block text-center ${textOnBrand}`}>
-              <span className="text-sm font-medium">Interconsulta</span>
-            </div>
-
-            {/* Right: Actions */}
-            <div className="flex items-center gap-2">
+            {/* Nav Actions */}
+            <div className="flex items-center gap-1 sm:gap-2">
+              {/* Quick Mode Toggle */}
               <button
                 onClick={handleToggleQuickMode}
-                className={`px-2.5 py-1.5 rounded text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                className={`px-2 py-1.5 rounded text-xs font-medium transition-colors flex items-center gap-1 ${
                   quickMode
-                    ? 'bg-white/25 ring-1 ring-white/50'
-                    : 'bg-white/10 hover:bg-white/20'
-                } ${textOnBrand}`}
-                title="Ctrl+M"
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300'
+                    : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
+                }`}
+                title="Modo rapido (Ctrl+M)"
               >
                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
-                <span className="hidden md:inline">Rapido</span>
-                {quickMode && <span className="text-[10px] bg-white/30 px-1 rounded">ON</span>}
+                <span className="hidden sm:inline">Rapido</span>
               </button>
 
+              {/* Links */}
               <Link
                 href="/historial"
-                className={`p-2 rounded bg-white/10 hover:bg-white/20 transition-colors ${textOnBrand}`}
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
                 title="Historial"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -289,8 +271,8 @@ export default function HomePage() {
 
               <Link
                 href="/analitica"
-                className={`p-2 rounded bg-white/10 hover:bg-white/20 transition-colors ${textOnBrand}`}
-                title="Analitica"
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                title="Estadisticas"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -299,7 +281,7 @@ export default function HomePage() {
 
               <Link
                 href="/configuracion"
-                className={`p-2 rounded bg-white/10 hover:bg-white/20 transition-colors ${textOnBrand}`}
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
                 title="Configuracion"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -312,60 +294,65 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Metrics Bar */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 print:hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-          <div className="flex items-center justify-between gap-4 text-xs">
-            <div className="flex items-center gap-4 sm:gap-6">
-              <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span className="font-medium text-gray-900 dark:text-gray-100">{stats?.totalDocumentos ?? 0}</span>
-                <span className="hidden sm:inline">documentos</span>
-              </div>
-
-              <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      {/* ===== BARRA DE METRICAS ===== */}
+      <div className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 print:hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            {/* Metricas */}
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="font-medium text-gray-900 dark:text-gray-100">{tiempoAhorrado?.descripcion ?? '0 min'}</span>
-                <span className="hidden sm:inline">ahorrados</span>
+                <span className="text-gray-600 dark:text-gray-300">
+                  {tiempoAhorrado?.descripcion || '~7 min'} por informe
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span className="text-gray-600 dark:text-gray-300">
+                  {stats?.totalDocumentos || 0} documentos generados
+                </span>
               </div>
 
               {aiAvailable && (
-                <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
-                  <svg className="h-3.5 w-3.5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                  <svg className="h-3.5 w-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                   </svg>
-                  <span className="hidden sm:inline">IA disponible</span>
-                  <span className="sm:hidden">IA</span>
+                  <span className="text-gray-600 dark:text-gray-300">IA disponible</span>
                 </div>
               )}
             </div>
 
-            {/* Keyboard hints */}
-            <div className="hidden md:flex items-center gap-3 text-gray-400 dark:text-gray-500">
-              <span><kbd className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-[10px]">Ctrl+Enter</kbd> generar</span>
-              <span><kbd className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-[10px]">Ctrl+M</kbd> rapido</span>
+            {/* Atajos */}
+            <div className="hidden md:flex items-center gap-2 text-gray-400 dark:text-gray-500">
+              <kbd className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-600 rounded text-[10px]">Ctrl+Enter</kbd>
+              <span>generar</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Quick Mode Indicator */}
+      {/* ===== QUICK MODE BANNER ===== */}
       {quickMode && (
-        <div className="bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-800 print:hidden">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-xs">
+        <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 print:hidden">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
                 <span className="font-medium">Modo Consulta Rapida</span>
-                <span className="text-amber-600 dark:text-amber-400">- solo campos esenciales</span>
+                <span className="text-amber-600 dark:text-amber-400">Solo campos esenciales</span>
               </div>
-              <button onClick={handleToggleQuickMode} className="text-xs text-amber-700 dark:text-amber-300 hover:underline">
+              <button
+                onClick={handleToggleQuickMode}
+                className="text-amber-700 dark:text-amber-300 hover:underline"
+              >
                 Desactivar
               </button>
             </div>
@@ -373,17 +360,12 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-        {/* Legal Disclaimer */}
-        <div className="mb-3">
-          <LegalDisclaimer />
-        </div>
-
-        {/* Alerts */}
+      {/* ===== CONTENIDO PRINCIPAL ===== */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+        {/* Alertas */}
         {successMessage && (
-          <div className="mb-3 p-2.5 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-2 text-green-700 dark:text-green-300 text-sm">
-            <svg className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="mb-3 p-2 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded flex items-center gap-2 text-green-700 dark:text-green-300 text-sm">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
             {successMessage}
@@ -391,74 +373,59 @@ export default function HomePage() {
         )}
 
         {error && (
-          <div className="mb-3 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
-            <div className="flex items-start gap-2">
-              <svg className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div className="flex-1">
-                <p className="text-red-700 dark:text-red-300 text-sm">{error}</p>
-                <button onClick={() => setError(null)} className="mt-1 text-xs text-red-600 dark:text-red-400 hover:underline">
-                  Cerrar
-                </button>
-              </div>
+          <div className="mb-3 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-red-700 dark:text-red-300 text-sm">{error}</p>
+              <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
           </div>
         )}
 
         {webhookWarning && (
-          <div className="mb-3 p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg">
-            <div className="flex items-start gap-2">
-              <svg className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <div className="flex-1">
-                <p className="text-amber-700 dark:text-amber-300 text-sm">{webhookWarning}</p>
-                <button onClick={() => setWebhookWarning(null)} className="mt-1 text-xs text-amber-600 dark:text-amber-400 hover:underline">
-                  Cerrar
-                </button>
-              </div>
-            </div>
+          <div className="mb-3 p-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded text-amber-700 dark:text-amber-300 text-sm">
+            {webhookWarning}
           </div>
         )}
 
-        {/* Auto Draft in Quick Mode */}
+        {/* Auto Draft Preview */}
         {quickMode && autoDraft && (
-          <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300 text-xs">
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-                <span className="font-medium">Borrador autogenerado</span>
-              </div>
-              <span className="text-xs text-blue-500 dark:text-blue-400">Pulsa Generar para version final</span>
+          <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-blue-800 dark:text-blue-200">Borrador en tiempo real</span>
+              <span className="text-[10px] text-blue-500">Pulsa Generar para finalizar</span>
             </div>
-            <pre className="text-xs text-blue-800 dark:text-blue-200 whitespace-pre-wrap max-h-24 overflow-y-auto bg-white/50 dark:bg-gray-800/50 rounded p-2">
-              {autoDraft.substring(0, 400)}{autoDraft.length > 400 ? '...' : ''}
+            <pre className="text-xs text-blue-700 dark:text-blue-300 whitespace-pre-wrap max-h-20 overflow-y-auto">
+              {autoDraft.substring(0, 300)}{autoDraft.length > 300 ? '...' : ''}
             </pre>
           </div>
         )}
 
-        {/* Two Column Layout */}
-        <div className={`grid gap-4 ${quickMode ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
-          {/* Form Column */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="p-1.5 bg-blue-100 dark:bg-blue-900/50 rounded">
-                  <svg className="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    Datos de la Interconsulta
-                  </h2>
-                  {quickMode && (
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400">Campos esenciales</p>
-                  )}
-                </div>
+        {/* Legal */}
+        <div className="mb-4">
+          <LegalDisclaimer />
+        </div>
+
+        {/* Layout de dos columnas */}
+        <div className={`grid gap-4 lg:gap-6 ${quickMode ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
+          {/* Columna: Formulario */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
+            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100 dark:border-gray-700">
+              <div className="h-8 w-8 rounded bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                <svg className="h-4 w-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  Datos de la Interconsulta
+                </h2>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                  {quickMode ? 'Campos esenciales' : 'Complete los campos requeridos'}
+                </p>
               </div>
             </div>
             <InterconsultaForm
@@ -469,9 +436,9 @@ export default function HomePage() {
             />
           </div>
 
-          {/* Generated Text Column */}
+          {/* Columna: Resultado */}
           {(!quickMode || generatedText) && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5 lg:sticky lg:top-4 lg:h-fit lg:max-h-[calc(100vh-6rem)]">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5 lg:sticky lg:top-4">
               <GeneratedTextPanel
                 text={generatedText}
                 originalText={originalText}
@@ -482,18 +449,18 @@ export default function HomePage() {
                 servicioDestino={formData?.servicioDestino}
               />
 
-              {/* Multi-Document Actions */}
+              {/* Multi-Document */}
               {generatedText && formData && (
                 <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <div className="relative">
                     <button
                       onClick={() => setShowMultiDocMenu(!showMultiDocMenu)}
-                      className="w-full px-3 py-2 text-xs font-medium rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-2"
+                      className="w-full px-3 py-2 text-xs font-medium rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center justify-center gap-2"
                     >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
                       </svg>
-                      Crear otro documento con estos datos
+                      Crear otro documento
                       <svg className={`h-3.5 w-3.5 transition-transform ${showMultiDocMenu ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
@@ -501,24 +468,21 @@ export default function HomePage() {
 
                     {showMultiDocMenu && (
                       <div className="absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2 z-10">
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400 px-2 mb-2">
-                          Generar otro documento con los mismos datos del paciente:
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400 px-2 mb-1">
+                          Usar los mismos datos del paciente:
                         </p>
-                        <div className="space-y-1">
+                        <div className="space-y-0.5">
                           {DOCUMENT_TYPES.filter(d => d.id !== 'interconsulta').map(doc => (
                             <Link
                               key={doc.id}
                               href={doc.ruta}
                               onClick={handleCreateCase}
-                              className="flex items-center gap-3 px-3 py-2 rounded hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                              className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                             >
-                              <svg className={`h-4 w-4 ${getDocumentIconClass(doc.icon)}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <svg className={`h-3.5 w-3.5 ${getDocumentIconClass(doc.icon)}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                               </svg>
-                              <div>
-                                <p className="text-xs font-medium text-gray-900 dark:text-gray-100">{doc.nombre}</p>
-                                <p className="text-[11px] text-gray-500 dark:text-gray-400">{doc.descripcion}</p>
-                              </div>
+                              <span className="text-xs text-gray-700 dark:text-gray-300">{doc.nombre}</span>
                             </Link>
                           ))}
                         </div>
@@ -532,14 +496,15 @@ export default function HomePage() {
         </div>
       </main>
 
-      {/* Discrete Footer */}
+      {/* ===== FOOTER ===== */}
       <footer className="mt-8 py-4 border-t border-gray-200 dark:border-gray-700 print:hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
-            <div className="flex items-center gap-4">
-              <span>Generador de Documentos Medicos v3.0</span>
-              <Link href="/historial" className="hover:text-gray-700 dark:hover:text-gray-300">Historial</Link>
-              <Link href="/analitica" className="hover:text-gray-700 dark:hover:text-gray-300">Productividad</Link>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-400 dark:text-gray-500">
+            <div className="flex items-center gap-3">
+              <span>Generador de Interconsultas v3.0</span>
+              <span className="hidden sm:inline">|</span>
+              <Link href="/historial" className="hover:text-gray-600 dark:hover:text-gray-300">Historial</Link>
+              <Link href="/configuracion" className="hover:text-gray-600 dark:hover:text-gray-300">Configuracion</Link>
             </div>
             <LegalDisclaimer variant="compact" />
           </div>
