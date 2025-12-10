@@ -14,7 +14,7 @@ import { useState, useRef, useEffect } from 'react';
 const documentTypes = [
   { href: '/', label: 'Interconsulta', icon: '📋', color: 'blue' },
   { href: '/documents/informe-alta', label: 'Informe de Alta', icon: '🏥', color: 'green' },
-  { href: '/documents/peticion-pruebas', label: 'Petición de Pruebas', icon: '🔬', color: 'purple', disabled: true },
+  { href: '/documents/peticion-pruebas', label: 'Petición de Pruebas', icon: '🔬', color: 'purple' },
   { href: '/documents/nota-evolutiva', label: 'Nota Evolutiva', icon: '📝', color: 'amber', disabled: true },
   { href: '/documents/informe-social', label: 'Informe Social', icon: '👥', color: 'pink', disabled: true },
 ];
