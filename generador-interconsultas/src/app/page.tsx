@@ -26,6 +26,7 @@ export default function HomePage() {
   const [enhancing, setEnhancing] = useState(false);
   const [aiAvailable, setAiAvailable] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [webhookWarning, setWebhookWarning] = useState<string | null>(null);
 
   // Verificar si la IA está disponible al cargar
   useEffect(() => {
@@ -47,7 +48,7 @@ export default function HomePage() {
       const config = getConfiguracion();
       if (!config?.webhookEnabled || !config?.webhookUrl) return;
 
-      await fetch('/api/hooks/interconsulta-creada', {
+      const response = await fetch('/api/hooks/interconsulta-creada', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -59,9 +60,22 @@ export default function HomePage() {
           },
         }),
       });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        setWebhookWarning('El documento se generó correctamente, pero no se pudo enviar al webhook externo.');
+        // Auto-dismiss after 8 seconds
+        setTimeout(() => setWebhookWarning(null), 8000);
+      } else if (result.sent) {
+        // Webhook sent successfully - clear any previous warning
+        setWebhookWarning(null);
+      }
     } catch (err) {
       console.warn('Error enviando webhook:', err);
-      // No bloquear la UI por error de webhook
+      setWebhookWarning('El documento se generó correctamente, pero hubo un error de conexión con el webhook.');
+      // Auto-dismiss after 8 seconds
+      setTimeout(() => setWebhookWarning(null), 8000);
     }
   };
 
@@ -167,6 +181,34 @@ export default function HomePage() {
             <button
               onClick={() => setError(null)}
               className="mt-2 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 underline"
+            >
+              Cerrar
+            </button>
+          </div>
+        )}
+
+        {/* Webhook warning toast */}
+        {webhookWarning && (
+          <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <div className="flex items-center gap-2">
+              <svg
+                className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+              <p className="text-amber-700 dark:text-amber-300 text-sm">{webhookWarning}</p>
+            </div>
+            <button
+              onClick={() => setWebhookWarning(null)}
+              className="mt-2 text-sm text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 underline"
             >
               Cerrar
             </button>

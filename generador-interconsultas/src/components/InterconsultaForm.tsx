@@ -6,11 +6,15 @@
  * Incluye todos los campos necesarios organizados en secciones:
  * - Datos generales (servicio destino, prioridad)
  * - Datos del paciente
- * - Información clínica
+ * - Información clínica (con presets por especialidad)
  * - Datos del médico
+ *
+ * Atajos de teclado:
+ * - Ctrl+Enter: Generar interconsulta
+ * - Esc: Cerrar mensajes de error
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   InterconsultaFormData,
   Prioridad,
@@ -19,6 +23,7 @@ import {
   ValidationError
 } from '@/types';
 import { validateInterconsultaForm, getFieldError } from '@/lib/validation';
+import { getPresetByServicio, SpecialtyPreset } from '@/data/presets';
 
 interface InterconsultaFormProps {
   initialValues?: Partial<InterconsultaFormData>;
@@ -61,6 +66,7 @@ export default function InterconsultaForm({
   loading = false,
 }: InterconsultaFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
+  const firstInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<InterconsultaFormData>({
     ...initialFormState,
     ...initialValues,
@@ -68,6 +74,8 @@ export default function InterconsultaForm({
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [servicios, setServicios] = useState<ServicioDestino[]>([]);
   const [loadingServicios, setLoadingServicios] = useState(true);
+  const [currentPreset, setCurrentPreset] = useState<SpecialtyPreset | null>(null);
+  const [showPresetModal, setShowPresetModal] = useState(false);
 
   // Cargar servicios destino desde la API al montar el componente
   useEffect(() => {
@@ -87,18 +95,43 @@ export default function InterconsultaForm({
     loadServicios();
   }, []);
 
-  // Atajo de teclado: Ctrl+Enter (o Cmd+Enter en Mac) para generar
+  // Auto-focus en el primer campo al cargar
+  useEffect(() => {
+    // Pequeño delay para asegurar que el DOM está listo
+    const timer = setTimeout(() => {
+      firstInputRef.current?.focus();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Actualizar preset cuando cambia el servicio destino
+  useEffect(() => {
+    if (formData.servicioDestino) {
+      const preset = getPresetByServicio(formData.servicioDestino);
+      setCurrentPreset(preset || null);
+    } else {
+      setCurrentPreset(null);
+    }
+  }, [formData.servicioDestino]);
+
+  // Atajos de teclado
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Enter o Cmd+Enter para generar
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
         formRef.current?.requestSubmit();
+      }
+      // Esc para cerrar errores
+      if (e.key === 'Escape' && errors.length > 0) {
+        e.preventDefault();
+        setErrors([]);
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [errors.length]);
 
   // Actualizar datos generales
   const updateField = <K extends keyof InterconsultaFormData>(
@@ -146,6 +179,40 @@ export default function InterconsultaForm({
     setErrors(prev => prev.filter(e => e.field !== `medico.${field}`));
   };
 
+  // Aplicar preset de especialidad
+  const handleApplyPreset = () => {
+    if (!currentPreset) return;
+
+    // Si ya hay texto en el motivo, preguntar antes de sobrescribir
+    if (formData.informacionClinica.motivoPrincipal.trim()) {
+      setShowPresetModal(true);
+    } else {
+      applyPresetToForm(false);
+    }
+  };
+
+  // Aplicar preset al formulario
+  const applyPresetToForm = (append: boolean) => {
+    if (!currentPreset) return;
+
+    setFormData(prev => ({
+      ...prev,
+      informacionClinica: {
+        ...prev.informacionClinica,
+        motivoPrincipal: append
+          ? `${prev.informacionClinica.motivoPrincipal}\n\n${currentPreset.motivoSugerido}`
+          : currentPreset.motivoSugerido,
+        antecedentesRelevantes: append && prev.informacionClinica.antecedentesRelevantes
+          ? `${prev.informacionClinica.antecedentesRelevantes}\n\n${currentPreset.recordatorioAntecedentes}`
+          : (prev.informacionClinica.antecedentesRelevantes || currentPreset.recordatorioAntecedentes),
+        exploracionDatosRelevantes: append && prev.informacionClinica.exploracionDatosRelevantes
+          ? `${prev.informacionClinica.exploracionDatosRelevantes}\n\n${currentPreset.recordatorioExploracion}`
+          : (prev.informacionClinica.exploracionDatosRelevantes || currentPreset.recordatorioExploracion),
+      },
+    }));
+    setShowPresetModal(false);
+  };
+
   // Manejar envío del formulario
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,378 +235,447 @@ export default function InterconsultaForm({
   const handleClear = () => {
     setFormData(initialFormState);
     setErrors([]);
+    setCurrentPreset(null);
+    // Re-focus en el primer campo
+    firstInputRef.current?.focus();
   };
 
   // Renderizar mensaje de error
   const renderError = (field: string) => {
     const error = getFieldError(errors, field);
     if (!error) return null;
-    return <p className="mt-1 text-sm text-red-600">{error}</p>;
+    return <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>;
   };
 
   // Clase base para inputs
   const inputClass = (field: string) =>
-    `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-      getFieldError(errors, field) ? 'border-red-500 bg-red-50' : 'border-gray-300'
+    `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors dark:bg-gray-800 dark:text-gray-100 ${
+      getFieldError(errors, field)
+        ? 'border-red-500 bg-red-50 dark:bg-red-900/20 dark:border-red-500'
+        : 'border-gray-300 dark:border-gray-600'
     }`;
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
-      {/* Errores globales */}
-      {errors.length > 0 && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-800 font-medium">
-            Por favor, corrija los siguientes errores:
-          </p>
-          <ul className="mt-2 list-disc list-inside text-red-700 text-sm">
-            {errors.map((error, index) => (
-              <li key={index}>{error.message}</li>
-            ))}
-          </ul>
+    <>
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
+        {/* Errores globales */}
+        {errors.length > 0 && (
+          <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+            <div className="flex justify-between items-start">
+              <p className="text-red-800 dark:text-red-300 font-medium">
+                Por favor, corrija los siguientes errores:
+              </p>
+              <button
+                type="button"
+                onClick={() => setErrors([])}
+                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm flex items-center gap-1"
+                title="Cerrar (Esc)"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <ul className="mt-2 list-disc list-inside text-red-700 dark:text-red-400 text-sm">
+              {errors.map((error, index) => (
+                <li key={index}>{error.message}</li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-red-600 dark:text-red-500">Pulsa Esc para cerrar</p>
+          </div>
+        )}
+
+        {/* Sección: Datos Generales */}
+        <fieldset className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+          <legend className="px-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+            Datos Generales
+          </legend>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            {/* Tipo de documento (bloqueado) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Tipo de documento
+              </label>
+              <input
+                type="text"
+                value="Interconsulta"
+                disabled
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+              />
+            </div>
+
+            {/* Prioridad */}
+            <div data-has-error={!!getFieldError(errors, 'prioridad')}>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Prioridad <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.prioridad}
+                onChange={e => updateField('prioridad', e.target.value as Prioridad)}
+                className={inputClass('prioridad')}
+              >
+                {prioridades.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+              {renderError('prioridad')}
+            </div>
+
+            {/* Servicio remitente */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Servicio remitente
+              </label>
+              <input
+                type="text"
+                value={formData.servicioRemitente}
+                onChange={e => updateField('servicioRemitente', e.target.value)}
+                placeholder="Ej: Atención Primaria, Urgencias..."
+                className={inputClass('servicioRemitente')}
+              />
+            </div>
+
+            {/* Servicio destino */}
+            <div data-has-error={!!getFieldError(errors, 'servicioDestino')}>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Servicio destino <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.servicioDestino}
+                onChange={e => updateField('servicioDestino', e.target.value)}
+                className={inputClass('servicioDestino')}
+                disabled={loadingServicios}
+              >
+                {loadingServicios ? (
+                  <option value="">Cargando servicios...</option>
+                ) : (
+                  <>
+                    <option value="">Seleccione un servicio...</option>
+                    {servicios.map(s => (
+                      <option key={s.id} value={s.nombre}>{s.nombre}</option>
+                    ))}
+                  </>
+                )}
+              </select>
+              {renderError('servicioDestino')}
+
+              {/* Botón de preset si está disponible */}
+              {currentPreset && (
+                <button
+                  type="button"
+                  onClick={handleApplyPreset}
+                  className="mt-2 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-1 transition-colors"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  Usar plantilla de {currentPreset.servicio}
+                </button>
+              )}
+            </div>
+          </div>
+        </fieldset>
+
+        {/* Sección: Datos del Paciente */}
+        <fieldset className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+          <legend className="px-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+            Datos del Paciente
+          </legend>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            {/* Nombre/iniciales */}
+            <div data-has-error={!!getFieldError(errors, 'paciente.nombre')}>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Nombre / Iniciales <span className="text-red-500">*</span>
+              </label>
+              <input
+                ref={firstInputRef}
+                type="text"
+                value={formData.paciente.nombre}
+                onChange={e => updatePaciente('nombre', e.target.value)}
+                placeholder="Ej: J.G.M. o nombre completo"
+                className={inputClass('paciente.nombre')}
+              />
+              {renderError('paciente.nombre')}
+            </div>
+
+            {/* Edad */}
+            <div data-has-error={!!getFieldError(errors, 'paciente.edad')}>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Edad (años) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="150"
+                value={formData.paciente.edad || ''}
+                onChange={e => updatePaciente('edad', parseInt(e.target.value) || 0)}
+                placeholder="Ej: 65"
+                className={inputClass('paciente.edad')}
+              />
+              {renderError('paciente.edad')}
+            </div>
+
+            {/* Sexo */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Sexo
+              </label>
+              <select
+                value={formData.paciente.sexo}
+                onChange={e => updatePaciente('sexo', e.target.value as Sexo)}
+                className={inputClass('paciente.sexo')}
+              >
+                {sexos.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Identificador */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                ID / Historia Clínica
+              </label>
+              <input
+                type="text"
+                value={formData.paciente.identificador}
+                onChange={e => updatePaciente('identificador', e.target.value)}
+                placeholder="Opcional"
+                className={inputClass('paciente.identificador')}
+              />
+            </div>
+          </div>
+        </fieldset>
+
+        {/* Sección: Información Clínica */}
+        <fieldset className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+          <legend className="px-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+            Información Clínica
+          </legend>
+
+          <div className="space-y-4 mt-4">
+            {/* Motivo principal */}
+            <div data-has-error={!!getFieldError(errors, 'informacionClinica.motivoPrincipal')}>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Motivo principal de la interconsulta <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={formData.informacionClinica.motivoPrincipal}
+                onChange={e => updateInfoClinica('motivoPrincipal', e.target.value)}
+                rows={3}
+                placeholder="Describa el motivo principal por el que solicita la interconsulta..."
+                className={inputClass('informacionClinica.motivoPrincipal')}
+              />
+              {renderError('informacionClinica.motivoPrincipal')}
+            </div>
+
+            {/* Antecedentes relevantes */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Antecedentes relevantes
+              </label>
+              <textarea
+                value={formData.informacionClinica.antecedentesRelevantes}
+                onChange={e => updateInfoClinica('antecedentesRelevantes', e.target.value)}
+                rows={3}
+                placeholder="Antecedentes médicos, quirúrgicos, familiares relevantes para esta consulta..."
+                className={inputClass('informacionClinica.antecedentesRelevantes')}
+              />
+            </div>
+
+            {/* Exploración / datos relevantes */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Exploración / Datos relevantes
+              </label>
+              <textarea
+                value={formData.informacionClinica.exploracionDatosRelevantes}
+                onChange={e => updateInfoClinica('exploracionDatosRelevantes', e.target.value)}
+                rows={3}
+                placeholder="Hallazgos de exploración física, pruebas complementarias, analíticas..."
+                className={inputClass('informacionClinica.exploracionDatosRelevantes')}
+              />
+            </div>
+
+            {/* Presunción diagnóstica */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Presunción diagnóstica
+              </label>
+              <textarea
+                value={formData.informacionClinica.presuncionDiagnostica}
+                onChange={e => updateInfoClinica('presuncionDiagnostica', e.target.value)}
+                rows={2}
+                placeholder="Diagnóstico de sospecha o diagnósticos diferenciales..."
+                className={inputClass('informacionClinica.presuncionDiagnostica')}
+              />
+            </div>
+
+            {/* Tratamiento actual */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Tratamiento actual relevante
+              </label>
+              <textarea
+                value={formData.informacionClinica.tratamientoActual}
+                onChange={e => updateInfoClinica('tratamientoActual', e.target.value)}
+                rows={2}
+                placeholder="Medicación actual relevante para la interconsulta..."
+                className={inputClass('informacionClinica.tratamientoActual')}
+              />
+            </div>
+          </div>
+        </fieldset>
+
+        {/* Sección: Datos del Médico */}
+        <fieldset className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+          <legend className="px-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+            Datos del Médico Remitente
+          </legend>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            {/* Nombre del médico */}
+            <div data-has-error={!!getFieldError(errors, 'medico.nombre')}>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Nombre del médico <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.medico.nombre}
+                onChange={e => updateMedico('nombre', e.target.value)}
+                placeholder="Dr./Dra. Nombre Apellidos"
+                className={inputClass('medico.nombre')}
+              />
+              {renderError('medico.nombre')}
+            </div>
+
+            {/* Servicio del médico */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Servicio
+              </label>
+              <input
+                type="text"
+                value={formData.medico.servicio}
+                onChange={e => updateMedico('servicio', e.target.value)}
+                placeholder="Ej: Medicina Familiar"
+                className={inputClass('medico.servicio')}
+              />
+            </div>
+
+            {/* Número de colegiado */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Nº de colegiado
+              </label>
+              <input
+                type="text"
+                value={formData.medico.numeroColegiado}
+                onChange={e => updateMedico('numeroColegiado', e.target.value)}
+                placeholder="Opcional"
+                className={inputClass('medico.numeroColegiado')}
+              />
+            </div>
+
+            {/* Centro/Hospital */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Centro / Hospital
+              </label>
+              <input
+                type="text"
+                value={formData.medico.centro}
+                onChange={e => updateMedico('centro', e.target.value)}
+                placeholder="Ej: Hospital Universitario..."
+                className={inputClass('medico.centro')}
+              />
+            </div>
+          </div>
+        </fieldset>
+
+        {/* Botones de acción */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex-1 px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="none"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                Generando...
+              </span>
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                Generar Interconsulta
+                <kbd className="hidden sm:inline-flex items-center px-2 py-0.5 text-xs bg-blue-700 rounded">
+                  Ctrl+Enter
+                </kbd>
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleClear}
+            disabled={loading}
+            className="px-6 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 transition-colors disabled:opacity-50"
+          >
+            Limpiar formulario
+          </button>
+        </div>
+      </form>
+
+      {/* Modal de confirmación para preset */}
+      {showPresetModal && currentPreset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              Aplicar plantilla de {currentPreset.servicio}
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Ya hay texto en algunos campos. ¿Cómo desea aplicar la plantilla?
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => applyPresetToForm(true)}
+                className="w-full px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Añadir al final del texto existente
+              </button>
+              <button
+                onClick={() => applyPresetToForm(false)}
+                className="w-full px-4 py-2 text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
+              >
+                Reemplazar solo campos vacíos
+              </button>
+              <button
+                onClick={() => setShowPresetModal(false)}
+                className="w-full px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
         </div>
       )}
-
-      {/* Sección: Datos Generales */}
-      <fieldset className="p-4 border border-gray-200 rounded-lg">
-        <legend className="px-2 text-lg font-semibold text-gray-900">
-          Datos Generales
-        </legend>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-          {/* Tipo de documento (bloqueado) */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Tipo de documento
-            </label>
-            <input
-              type="text"
-              value="Interconsulta"
-              disabled
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-600"
-            />
-          </div>
-
-          {/* Prioridad */}
-          <div data-has-error={!!getFieldError(errors, 'prioridad')}>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Prioridad <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={formData.prioridad}
-              onChange={e => updateField('prioridad', e.target.value as Prioridad)}
-              className={inputClass('prioridad')}
-            >
-              {prioridades.map(p => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-            {renderError('prioridad')}
-          </div>
-
-          {/* Servicio remitente */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Servicio remitente
-            </label>
-            <input
-              type="text"
-              value={formData.servicioRemitente}
-              onChange={e => updateField('servicioRemitente', e.target.value)}
-              placeholder="Ej: Atención Primaria, Urgencias..."
-              className={inputClass('servicioRemitente')}
-            />
-          </div>
-
-          {/* Servicio destino */}
-          <div data-has-error={!!getFieldError(errors, 'servicioDestino')}>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Servicio destino <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={formData.servicioDestino}
-              onChange={e => updateField('servicioDestino', e.target.value)}
-              className={inputClass('servicioDestino')}
-              disabled={loadingServicios}
-            >
-              {loadingServicios ? (
-                <option value="">Cargando servicios...</option>
-              ) : (
-                <>
-                  <option value="">Seleccione un servicio...</option>
-                  {servicios.map(s => (
-                    <option key={s.id} value={s.nombre}>{s.nombre}</option>
-                  ))}
-                </>
-              )}
-            </select>
-            {renderError('servicioDestino')}
-          </div>
-        </div>
-      </fieldset>
-
-      {/* Sección: Datos del Paciente */}
-      <fieldset className="p-4 border border-gray-200 rounded-lg">
-        <legend className="px-2 text-lg font-semibold text-gray-900">
-          Datos del Paciente
-        </legend>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-          {/* Nombre/iniciales */}
-          <div data-has-error={!!getFieldError(errors, 'paciente.nombre')}>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nombre / Iniciales <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.paciente.nombre}
-              onChange={e => updatePaciente('nombre', e.target.value)}
-              placeholder="Ej: J.G.M. o nombre completo"
-              className={inputClass('paciente.nombre')}
-            />
-            {renderError('paciente.nombre')}
-          </div>
-
-          {/* Edad */}
-          <div data-has-error={!!getFieldError(errors, 'paciente.edad')}>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Edad (años) <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              min="0"
-              max="150"
-              value={formData.paciente.edad || ''}
-              onChange={e => updatePaciente('edad', parseInt(e.target.value) || 0)}
-              placeholder="Ej: 65"
-              className={inputClass('paciente.edad')}
-            />
-            {renderError('paciente.edad')}
-          </div>
-
-          {/* Sexo */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Sexo
-            </label>
-            <select
-              value={formData.paciente.sexo}
-              onChange={e => updatePaciente('sexo', e.target.value as Sexo)}
-              className={inputClass('paciente.sexo')}
-            >
-              {sexos.map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Identificador */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              ID / Historia Clínica
-            </label>
-            <input
-              type="text"
-              value={formData.paciente.identificador}
-              onChange={e => updatePaciente('identificador', e.target.value)}
-              placeholder="Opcional"
-              className={inputClass('paciente.identificador')}
-            />
-          </div>
-        </div>
-      </fieldset>
-
-      {/* Sección: Información Clínica */}
-      <fieldset className="p-4 border border-gray-200 rounded-lg">
-        <legend className="px-2 text-lg font-semibold text-gray-900">
-          Información Clínica
-        </legend>
-
-        <div className="space-y-4 mt-4">
-          {/* Motivo principal */}
-          <div data-has-error={!!getFieldError(errors, 'informacionClinica.motivoPrincipal')}>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Motivo principal de la interconsulta <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              value={formData.informacionClinica.motivoPrincipal}
-              onChange={e => updateInfoClinica('motivoPrincipal', e.target.value)}
-              rows={3}
-              placeholder="Describa el motivo principal por el que solicita la interconsulta..."
-              className={inputClass('informacionClinica.motivoPrincipal')}
-            />
-            {renderError('informacionClinica.motivoPrincipal')}
-          </div>
-
-          {/* Antecedentes relevantes */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Antecedentes relevantes
-            </label>
-            <textarea
-              value={formData.informacionClinica.antecedentesRelevantes}
-              onChange={e => updateInfoClinica('antecedentesRelevantes', e.target.value)}
-              rows={3}
-              placeholder="Antecedentes médicos, quirúrgicos, familiares relevantes para esta consulta..."
-              className={inputClass('informacionClinica.antecedentesRelevantes')}
-            />
-          </div>
-
-          {/* Exploración / datos relevantes */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Exploración / Datos relevantes
-            </label>
-            <textarea
-              value={formData.informacionClinica.exploracionDatosRelevantes}
-              onChange={e => updateInfoClinica('exploracionDatosRelevantes', e.target.value)}
-              rows={3}
-              placeholder="Hallazgos de exploración física, pruebas complementarias, analíticas..."
-              className={inputClass('informacionClinica.exploracionDatosRelevantes')}
-            />
-          </div>
-
-          {/* Presunción diagnóstica */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Presunción diagnóstica
-            </label>
-            <textarea
-              value={formData.informacionClinica.presuncionDiagnostica}
-              onChange={e => updateInfoClinica('presuncionDiagnostica', e.target.value)}
-              rows={2}
-              placeholder="Diagnóstico de sospecha o diagnósticos diferenciales..."
-              className={inputClass('informacionClinica.presuncionDiagnostica')}
-            />
-          </div>
-
-          {/* Tratamiento actual */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Tratamiento actual relevante
-            </label>
-            <textarea
-              value={formData.informacionClinica.tratamientoActual}
-              onChange={e => updateInfoClinica('tratamientoActual', e.target.value)}
-              rows={2}
-              placeholder="Medicación actual relevante para la interconsulta..."
-              className={inputClass('informacionClinica.tratamientoActual')}
-            />
-          </div>
-        </div>
-      </fieldset>
-
-      {/* Sección: Datos del Médico */}
-      <fieldset className="p-4 border border-gray-200 rounded-lg">
-        <legend className="px-2 text-lg font-semibold text-gray-900">
-          Datos del Médico Remitente
-        </legend>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-          {/* Nombre del médico */}
-          <div data-has-error={!!getFieldError(errors, 'medico.nombre')}>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nombre del médico <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.medico.nombre}
-              onChange={e => updateMedico('nombre', e.target.value)}
-              placeholder="Dr./Dra. Nombre Apellidos"
-              className={inputClass('medico.nombre')}
-            />
-            {renderError('medico.nombre')}
-          </div>
-
-          {/* Servicio del médico */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Servicio
-            </label>
-            <input
-              type="text"
-              value={formData.medico.servicio}
-              onChange={e => updateMedico('servicio', e.target.value)}
-              placeholder="Ej: Medicina Familiar"
-              className={inputClass('medico.servicio')}
-            />
-          </div>
-
-          {/* Número de colegiado */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nº de colegiado
-            </label>
-            <input
-              type="text"
-              value={formData.medico.numeroColegiado}
-              onChange={e => updateMedico('numeroColegiado', e.target.value)}
-              placeholder="Opcional"
-              className={inputClass('medico.numeroColegiado')}
-            />
-          </div>
-
-          {/* Centro/Hospital */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Centro / Hospital
-            </label>
-            <input
-              type="text"
-              value={formData.medico.centro}
-              onChange={e => updateMedico('centro', e.target.value)}
-              placeholder="Ej: Hospital Universitario..."
-              className={inputClass('medico.centro')}
-            />
-          </div>
-        </div>
-      </fieldset>
-
-      {/* Botones de acción */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <button
-          type="submit"
-          disabled={loading}
-          className="flex-1 px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  fill="none"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              Generando...
-            </span>
-          ) : (
-            <span className="flex items-center justify-center gap-2">
-              Generar Interconsulta
-              <kbd className="hidden sm:inline-flex items-center px-2 py-0.5 text-xs bg-blue-700 rounded">
-                Ctrl+Enter
-              </kbd>
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={handleClear}
-          disabled={loading}
-          className="px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 focus:ring-4 focus:ring-gray-200 transition-colors disabled:opacity-50"
-        >
-          Limpiar formulario
-        </button>
-      </div>
-    </form>
+    </>
   );
 }
