@@ -1,0 +1,144 @@
+{
+  "clinicId": "default",
+  "version": "1.0.0",
+  "ultimaModificacion": "2025-12-10T20:05:22.369Z",
+  "serviciosDestino": [
+    {
+      "id": "1",
+      "nombre": "Neurología",
+      "activo": true
+    },
+    {
+      "id": "2",
+      "nombre": "Cardiología",
+      "activo": true
+    },
+    {
+      "id": "3",
+      "nombre": "Traumatología",
+      "activo": true
+    },
+    {
+      "id": "4",
+      "nombre": "Digestivo",
+      "activo": true
+    },
+    {
+      "id": "5",
+      "nombre": "Neumología",
+      "activo": true
+    },
+    {
+      "id": "6",
+      "nombre": "Nefrología",
+      "activo": true
+    },
+    {
+      "id": "7",
+      "nombre": "Endocrinología",
+      "activo": true
+    },
+    {
+      "id": "8",
+      "nombre": "Reumatología",
+      "activo": true
+    },
+    {
+      "id": "9",
+      "nombre": "Dermatología",
+      "activo": true
+    },
+    {
+      "id": "10",
+      "nombre": "Urología",
+      "activo": true
+    },
+    {
+      "id": "11",
+      "nombre": "Ginecología",
+      "activo": true
+    },
+    {
+      "id": "12",
+      "nombre": "Oftalmología",
+      "activo": true
+    },
+    {
+      "id": "13",
+      "nombre": "Otorrinolaringología",
+      "activo": true
+    },
+    {
+      "id": "14",
+      "nombre": "Psiquiatría",
+      "activo": true
+    },
+    {
+      "id": "15",
+      "nombre": "Rehabilitación",
+      "activo": true
+    },
+    {
+      "id": "16",
+      "nombre": "Trabajo Social",
+      "activo": true
+    },
+    {
+      "id": "17",
+      "nombre": "Fisioterapia",
+      "activo": true
+    },
+    {
+      "id": "18",
+      "nombre": "Medicina Interna",
+      "activo": true
+    },
+    {
+      "id": "19",
+      "nombre": "Cirugía General",
+      "activo": true
+    },
+    {
+      "id": "20",
+      "nombre": "Oncología",
+      "activo": true
+    },
+    {
+      "id": "21",
+      "nombre": "Hematología",
+      "activo": true
+    },
+    {
+      "id": "22",
+      "nombre": "Geriatría",
+      "activo": true
+    },
+    {
+      "id": "23",
+      "nombre": "Cuidados Paliativos",
+      "activo": true
+    }
+  ],
+  "plantillas": [
+    {
+      "id": "interconsulta-default",
+      "tipo": "interconsulta",
+      "nombre": "Plantilla Estándar de Interconsulta",
+      "contenido": "INTERCONSULTA AL SERVICIO DE {{servicioDestino}}\n\nPrioridad: {{prioridad}}\nFecha: {{fechaActual}}\n\n───────────────────────────────────────────────────────────────\n\nDATOS DEL PACIENTE\n\nNombre/Iniciales: {{pacienteNombre}}\nEdad: {{pacienteEdad}} años\nSexo: {{pacienteSexo}}\n{{#pacienteIdentificador}}Nº Historia Clínica: {{pacienteIdentificador}}{{/pacienteIdentificador}}\n\n───────────────────────────────────────────────────────────────\n\nMOTIVO DE LA INTERCONSULTA\n\n{{motivoPrincipal}}\n\n{{#antecedentesRelevantes}}\n───────────────────────────────────────────────────────────────\n\nANTECEDENTES RELEVANTES\n\n{{antecedentesRelevantes}}\n{{/antecedentesRelevantes}}\n\n{{#exploracionDatosRelevantes}}\n───────────────────────────────────────────────────────────────\n\nEXPLORACIÓN Y DATOS RELEVANTES\n\n{{exploracionDatosRelevantes}}\n{{/exploracionDatosRelevantes}}\n\n{{#presuncionDiagnostica}}\n───────────────────────────────────────────────────────────────\n\nPRESUNCIÓN DIAGNÓSTICA\n\n{{presuncionDiagnostica}}\n{{/presuncionDiagnostica}}\n\n{{#tratamientoActual}}\n───────────────────────────────────────────────────────────────\n\nTRATAMIENTO ACTUAL\n\n{{tratamientoActual}}\n{{/tratamientoActual}}\n\n───────────────────────────────────────────────────────────────\n\nMÉDICO REMITENTE\n\n{{medicoNombre}}\n{{#servicioRemitente}}Servicio: {{servicioRemitente}}{{/servicioRemitente}}\n{{#medicoNumeroColegiado}}Nº Colegiado: {{medicoNumeroColegiado}}{{/medicoNumeroColegiado}}\n{{#medicoCentro}}Centro: {{medicoCentro}}{{/medicoCentro}}",
+      "activa": true,
+      "fechaCreacion": "2025-12-10T20:05:22.322Z",
+      "fechaModificacion": "2025-12-10T20:05:22.322Z"
+    }
+  ],
+  "plantillasPorTipo": {
+    "interconsulta": {
+      "id": "interconsulta-default",
+      "tipo": "interconsulta",
+      "nombre": "Plantilla Estándar de Interconsulta",
+      "contenido": "INTERCONSULTA AL SERVICIO DE {{servicioDestino}}\n\nPrioridad: {{prioridad}}\nFecha: {{fechaActual}}\n\n───────────────────────────────────────────────────────────────\n\nDATOS DEL PACIENTE\n\nNombre/Iniciales: {{pacienteNombre}}\nEdad: {{pacienteEdad}} años\nSexo: {{pacienteSexo}}\n{{#pacienteIdentificador}}Nº Historia Clínica: {{pacienteIdentificador}}{{/pacienteIdentificador}}\n\n───────────────────────────────────────────────────────────────\n\nMOTIVO DE LA INTERCONSULTA\n\n{{motivoPrincipal}}\n\n{{#antecedentesRelevantes}}\n───────────────────────────────────────────────────────────────\n\nANTECEDENTES RELEVANTES\n\n{{antecedentesRelevantes}}\n{{/antecedentesRelevantes}}\n\n{{#exploracionDatosRelevantes}}\n───────────────────────────────────────────────────────────────\n\nEXPLORACIÓN Y DATOS RELEVANTES\n\n{{exploracionDatosRelevantes}}\n{{/exploracionDatosRelevantes}}\n\n{{#presuncionDiagnostica}}\n───────────────────────────────────────────────────────────────\n\nPRESUNCIÓN DIAGNÓSTICA\n\n{{presuncionDiagnostica}}\n{{/presuncionDiagnostica}}\n\n{{#tratamientoActual}}\n───────────────────────────────────────────────────────────────\n\nTRATAMIENTO ACTUAL\n\n{{tratamientoActual}}\n{{/tratamientoActual}}\n\n───────────────────────────────────────────────────────────────\n\nMÉDICO REMITENTE\n\n{{medicoNombre}}\n{{#servicioRemitente}}Servicio: {{servicioRemitente}}{{/servicioRemitente}}\n{{#medicoNumeroColegiado}}Nº Colegiado: {{medicoNumeroColegiado}}{{/medicoNumeroColegiado}}\n{{#medicoCentro}}Centro: {{medicoCentro}}{{/medicoCentro}}",
+      "activa": true,
+      "fechaCreacion": "2025-12-10T20:05:22.322Z",
+      "fechaModificacion": "2025-12-10T20:05:22.322Z"
+    }
+  }
+}
